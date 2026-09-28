@@ -2,9 +2,10 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 import '../../data/repository.dart';
+import 'qr_scanner_page.dart';
 
 /// El comercio tipea el código de 6 caracteres que muestra el cliente
-/// (el mismo que va dentro del QR). Escanear con cámara: ver ROADMAP.
+/// (el mismo que va dentro del QR) o lo escanea con la cámara.
 class RedeemDialog extends StatefulWidget {
   const RedeemDialog({super.key});
 
@@ -23,6 +24,15 @@ class _RedeemDialogState extends State<RedeemDialog> {
     super.dispose();
   }
 
+  Future<void> _scan() async {
+    final code = await Navigator.of(context).push<String>(
+      MaterialPageRoute(fullscreenDialog: true, builder: (_) => const QrScannerPage()),
+    );
+    if (code == null || !mounted) return;
+    _code.text = code;
+    await _redeem();
+  }
+
   Future<void> _redeem() async {
     setState(() {
       _busy = true;
@@ -33,7 +43,7 @@ class _RedeemDialogState extends State<RedeemDialog> {
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('✅ Entregado: $bagTitle')),
+        SnackBar(content: Text('Entregado: $bagTitle')),
       );
     } on FirebaseFunctionsException catch (e) {
       setState(() => _error = e.message ?? e.code);
@@ -52,11 +62,17 @@ class _RedeemDialogState extends State<RedeemDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Ingresa el código que aparece bajo el QR del cliente.'),
+            FilledButton.icon(
+              onPressed: _busy ? null : _scan,
+              icon: const Icon(Icons.qr_code_scanner),
+              label: const Text('Escanear QR'),
+              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            ),
             const SizedBox(height: 16),
+            const Text('O escribe el código que aparece bajo el QR:'),
+            const SizedBox(height: 8),
             TextField(
               controller: _code,
-              autofocus: true,
               maxLength: 6,
               textCapitalization: TextCapitalization.characters,
               style: const TextStyle(fontSize: 24, letterSpacing: 6),

@@ -1,9 +1,20 @@
 # Woowfy — Hoja de ruta
 
 Marketplace de bolsas sorpresa contra el desperdicio de comida. Chile primero, luego Latam.
-Marca las casillas a medida que avancemos. Última actualización: 27-09-2026.
+Marca las casillas a medida que avancemos. Última actualización: 28-09-2026.
 
 **En línea:** [woowfy.com](https://woowfy.com) (landing) · [app.woowfy.com](https://app.woowfy.com) (app)
+
+## 📍 Dónde quedamos (28-09-2026)
+
+MVP técnico completo con pago **simulado**: clientes (lista, mapa, favoritos, reserva, QR, impacto),
+comercios (perfil, bolsas y recurrentes, validar retiro con cámara) y admin (solicitudes, comercios, ventas,
+interesados, usuarios, correo). Sprints 1 y 2 terminados y desplegados. La landing está "en construcción"
+con lista de espera.
+
+**Para retomar, primero lo que depende de ti** (sección "Pendiente" más abajo): clave VAPID para activar
+las notificaciones, cuenta de Resend, reenvío de correo con ImprovMX y revisar el mapa en la app.
+Luego, decidir el Sprint 3 o avanzar con la SpA y Mercado Pago (Fase 2).
 
 ---
 
@@ -29,7 +40,7 @@ retirar una bolsa ajena. Al validar el código:
 - el cliente tiene prueba de su compra si hay un problema.
 
 El QR contiene el mismo código de 6 caracteres que aparece debajo: el comercio puede
-**tipearlo** (ya funciona) o **escanearlo con la cámara** (pendiente, Fase 2).
+**escanearlo con la cámara** o **tipearlo**.
 
 ---
 
@@ -46,7 +57,7 @@ El QR contiene el mismo código de 6 caracteres que aparece debajo: el comercio 
 ### Hecho ✅
 - [x] Proyecto Flutter (web + Android + iOS) y Firebase `woowfy-app`
 - [x] Firestore en Santiago (`southamerica-west1`), reglas de seguridad e índices
-- [x] Inicio con bolsas del día y filtro por comuna
+- [x] Inicio con bolsas del día (luego: todo Chile, con filtros, orden y mapa)
 - [x] Registro / ingreso con correo
 - [x] Panel del comercio: solicitud de alta, publicar bolsas, activar/pausar
 - [x] Cloud Functions: reservar (con descuento de stock), pagar, cancelar, validar retiro
@@ -62,17 +73,63 @@ El QR contiene el mismo código de 6 caracteres que aparece debajo: el comercio 
 - [x] **Dominios propios** (DNS en Piensa Solutions): `woowfy.com` → landing, `www.woowfy.com` → landing,
       `app.woowfy.com` → app. Dominios autorizados en Firebase Authentication.
 
-### Pendiente
-- [ ] Confirmar HTTPS en `woowfy.com` (el certificado se estaba emitiendo al 27-09-2026)
-- [ ] Redirección 301 `www.woowfy.com` → `woowfy.com` (consola → Hosting → sitio woowfy-app → editar dominio)
-- [ ] Agregar `woowfy-app-web.web.app` a Dominios autorizados de Authentication
-- [ ] Configurar una **alerta de presupuesto** en Google Cloud Billing (ej. USD 10)
-- [ ] Crear tu usuario admin en producción (ver README)
-- [ ] Primer commit y subir el repositorio (el `.gitignore` ya excluye builds, dependencias y secretos)
-- [ ] Recuperar contraseña e ingreso con Google
-- [ ] Términos y Condiciones, Política de Privacidad (Ley 21.719) y política de cancelación
-- [ ] Imagen para compartir en redes (og:image 1200×630) y crear casilla `hola@woowfy.com`
-      (el dominio aún no tiene registros MX de correo)
+- [x] Identidad de marca (brand kit v2) aplicada en landing y app; íconos corregidos en `brand/fixed/`
+- [x] Landing "en construcción" con **lista de espera** (región + comuna, todo Chile) y pestaña **Interesados** en el admin
+- [x] Rutas de la app en inglés (`/bag`, `/login`, `/orders`, `/order`, `/merchant`, `/admin`)
+- [x] Sin segmentar por comuna: la app muestra bolsas de todo Chile; locales e inscritos guardan región y comuna
+- [x] Lista de espera con **nombre** (para campañas) y exportación CSV desde Admin → Interesados
+- [x] Correo de bienvenida con Resend (función `onWaitlistCreated`) y remitente configurable en **Admin → Correo**
+- [x] Recuperar contraseña, ingreso con Google y nombre en el registro
+- [x] **Diseño A "Verde profundo"** en toda la app + navegación (Bolsas / Mis pedidos / Cuenta)
+- [x] Fotos de bolsas (Firebase Storage, subida opcional al publicar) con ícono de "sin imagen" de respaldo
+- [x] App en español de Chile (hora 24 h) y caché web corregida (cada deploy fuerza la versión nueva)
+
+### Sprint 1 — listo para el piloto con locales ✅
+- [x] Perfil del local: logo, categoría, descripción, horario (se copian a sus bolsas)
+- [x] Bolsas recurrentes por día de la semana (se publican solas a las 5:00)
+- [x] Escanear el QR con la cámara al validar retiros
+- [x] Filtros en el inicio: categoría, "retiro ahora", orden por horario / precio / descuento
+- [x] Admin → Usuarios: buscar y dar o quitar admin
+- [x] Borradores de Términos y Política de privacidad (`/terms`, `/privacy`)
+
+### Sprint 2 — retención ✅
+- [x] Mapa (OpenStreetMap) y orden "Más cerca" con distancia en cada bolsa
+- [x] Favoritos (seguir locales) + filtro, y aviso push cuando publican
+- [x] Recordatorio push antes del horario de retiro
+- [x] Tu impacto (bolsas rescatadas, ahorro, CO₂ evitado estimado)
+- [x] Compartir bolsa (menú nativo o copiar enlace)
+- [x] Instalar la app (PWA) desde Cuenta
+- [ ] **Activar push:** generar la clave VAPID en la consola y ponerla en `lib/core/push.dart`
+
+### Sprint 3 — confianza y operación (propuesto, por decidir)
+- [ ] Calificar el retiro (1–5 estrellas) y nota visible del local
+- [ ] Cancelar pedido hasta X horas antes, con reembolso (necesario con pagos reales)
+- [ ] Cancelar bolsas del día con aviso a los clientes
+- [ ] Historial de ventas y liquidaciones para el comercio
+- [ ] Analítica (visitas y conversión de landing y app)
+- [ ] Más adelante: empleados por local, reclamos y moderación, invitar amigos (referidos)
+
+### Pendiente (depende de ti)
+- [ ] 🔔 **Clave VAPID** para notificaciones push: consola Firebase → Configuración del proyecto → Cloud Messaging
+      → Certificados push web → Generar. La clave pública va en `lib/core/push.dart` y se redespliega la app.
+- [ ] ✉️ **Activar correos:** cuenta Resend + verificar `woowfy.com` (DNS en Piensa Solutions) +
+      `firebase functions:secrets:set RESEND_API_KEY` + redeploy de las funciones de correo + activar en
+      Admin → Correo (hoy el secreto tiene un valor provisional)
+- [ ] 📥 Reenvío `hola@woowfy.com` → Gmail con ImprovMX (MX `mx1/mx2.improvmx.com`, TXT SPF) y TXT `_dmarc`
+- [ ] 🗺️ Revisar el mapa en la app y poner la dirección real de tu local (hoy ubicado en el centro de El Monte)
+- [ ] ⚖️ Revisión legal de `/terms` y `/privacy` y completar datos de la SpA (razón social, RUT, domicilio)
+- [ ] 💰 **Alerta de presupuesto** en Google Cloud Billing (ej. USD 10)
+- [ ] ↪️ Redirección 301 `www.woowfy.com` → `woowfy.com` (consola → Hosting → sitio woowfy-app → editar dominio)
+- [ ] Personalizar la plantilla del correo "recuperar contraseña" (Authentication → Plantillas)
+- [ ] Correo de lanzamiento a la lista de espera (exportar CSV desde Admin → Interesados)
+- [ ] Pedir al diseñador un brand kit con el isotipo centrado (el v2 viene cortado)
+
+### Resuelto en el camino
+- [x] HTTPS en `woowfy.com`, `www` y `app`
+- [x] `woowfy-app-web.web.app` en Dominios autorizados de Authentication
+- [x] Usuario admin en producción y tu local "Woowfy App" aprobado
+- [x] Fotos visibles en la app (CORS del bucket de Storage)
+- [x] Imagen para compartir en redes (`og:image`) en la landing
 
 ## Fase 2 — Pagos reales y operación
 
@@ -87,19 +144,22 @@ El QR contiene el mismo código de 6 caracteres que aparece debajo: el comercio 
       - Opción B: todo entra a la SpA y se liquida semanalmente por transferencia. Más simple al inicio,
         pero la SpA maneja dinero de terceros (revisar con contador).
 - [ ] Reembolsos (bolsa no entregada / local cerrado)
-- [ ] Escanear QR con la cámara en el panel del comercio (`mobile_scanner`, funciona en web)
-- [ ] Notificaciones: "tu favorito publicó bolsas" (web push / FCM) y correo de confirmación
-- [ ] Favoritos
+- [x] Escanear QR con la cámara en el panel del comercio (Sprint 1)
+- [x] Notificaciones "tu favorito publicó bolsas" y recordatorio de retiro (Sprint 2; falta la clave VAPID)
+- [ ] Correo de confirmación de compra (cuando Resend esté activo)
+- [x] Favoritos (Sprint 2)
 - [ ] Reportes para el comercio (ventas, kg rescatados, liquidaciones)
 
 ## Fase 3 — Tracción y apps móviles
 
-- [ ] 50–100 comercios activos en 5 comunas
+- [ ] 50–100 comercios activos
+- [ ] Íconos de Android/iOS con `flutter_launcher_icons` usando `brand/fixed/icon-1024.png`
 - [ ] Android en Google Play (compila desde Windows; USD 25 pago único)
 - [ ] iOS vía Codemagic (`codemagic.yaml`; Apple Developer USD 99/año; pruebas en TestFlight)
-- [ ] Búsqueda por cercanía (geohash) y mapa
+- [x] Mapa y orden por cercanía (Sprint 2)
+- [ ] Consultas por cercanía en el servidor (geohash) cuando haya muchos locales
 - [ ] Plan pagado para comercios (destacados, reportes de impacto)
-- [ ] Nuevas ciudades: Viña/Valparaíso, Concepción
+- [ ] Filtro por región/cercanía cuando haya suficientes locales
 
 ## Fase 4 — Latam
 

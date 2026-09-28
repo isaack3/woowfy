@@ -27,6 +27,11 @@ service cloud.firestore {
         && request.resource.data.role == resource.data.role) || isAdmin();
     }
 
+    // Locales favoritos de cada usuario (para avisarle cuando publican).
+    match /users/{uid}/favorites/{storeId} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
     match /stores/{storeId} {
       allow read: if resource.data.status == 'approved'
         || (signedIn() && resource.data.ownerUid == request.auth.uid)
@@ -55,6 +60,31 @@ service cloud.firestore {
       allow update: if isAdmin() || (ownsApprovedStore(resource.data.storeId)
         && request.resource.data.storeId == resource.data.storeId);
       allow delete: if ownsApprovedStore(resource.data.storeId) || isAdmin();
+    }
+
+    // Plantillas de bolsas recurrentes: las publica cada día la función publishRecurringBags.
+    match /bagTemplates/{id} {
+      function validTemplate(d) {
+        return d.price > 0 && d.price < d.originalPrice && d.quantity > 0
+          && d.days is list && d.days.size() > 0;
+      }
+      allow read: if ownsApprovedStore(resource.data.storeId) || isAdmin();
+      allow create: if ownsApprovedStore(request.resource.data.storeId) && validTemplate(request.resource.data);
+      allow update: if ownsApprovedStore(resource.data.storeId)
+        && request.resource.data.storeId == resource.data.storeId
+        && validTemplate(request.resource.data);
+      allow delete: if ownsApprovedStore(resource.data.storeId);
+    }
+
+    // Configuración de la plataforma (p. ej. config/email: remitente de los correos). Solo admin.
+    match /config/{doc} {
+      allow read, write: if isAdmin();
+    }
+
+    // Lista de espera de la landing: la escribe la función joinWaitlist, solo el admin la lee.
+    match /waitlist/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     match /orders/{orderId} {

@@ -19,7 +19,7 @@ class OrderPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Tu pedido'),
-        leading: BackButton(onPressed: () => context.go('/pedidos')),
+        leading: BackButton(onPressed: () => context.go('/orders')),
       ),
       body: StreamBuilder<BagOrder?>(
         stream: Repository.instance.watchOrder(orderId),
@@ -111,7 +111,7 @@ class _Body extends StatelessWidget {
             header,
             Icon(Icons.check_circle, size: 72, color: scheme.primary),
             const SizedBox(height: 8),
-            Text('¡Retirado! Gracias por rescatar comida 🌱', textAlign: TextAlign.center, style: t.titleMedium),
+            Text('¡Retirado! Gracias por rescatar comida', textAlign: TextAlign.center, style: t.titleMedium),
           ],
         );
       case OrderStatus.cancelled:

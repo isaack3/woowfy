@@ -7,7 +7,7 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Woowfy: bolsas sorpresa de locales cerca de ti a mitad de precio. Ahorra y evita el desperdicio de comida.">
-  <meta name="theme-color" content="#1F8A5B">
+  <meta name="theme-color" content="#063B25">
 
   <!-- iOS: permite "Agregar a pantalla de inicio" como app (PWA) -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -21,6 +21,28 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
+  <script>
+    // Instalación como app (PWA): guardamos el evento del navegador para ofrecerlo desde la pantalla Cuenta.
+    (function () {
+      let deferred = null;
+      addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferred = e; });
+      addEventListener('appinstalled', function () { deferred = null; });
+      window.woowfyPwa = {
+        canPrompt: function () { return deferred !== null; },
+        isInstalled: function () {
+          return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+        },
+        isIos: function () { return /iphone|ipad|ipod/i.test(navigator.userAgent); },
+        prompt: async function () {
+          if (!deferred) return false;
+          deferred.prompt();
+          const choice = await deferred.userChoice;
+          deferred = null;
+          return choice.outcome === 'accepted';
+        },
+      };
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

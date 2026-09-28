@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:woowfy/core/format.dart';
+import 'package:woowfy/core/location.dart';
 
 void main() {
   setUpAll(() => initializeDateFormatting('es_CL'));
@@ -14,5 +15,11 @@ void main() {
     final start = DateTime(2026, 10, 1, 19);
     final end = DateTime(2026, 10, 1, 20, 30);
     expect(formatPickupWindow(start, end), '19:00 – 20:30');
+  });
+
+  test('formatea distancias', () {
+    expect(formatDistance(347), '350 m');
+    expect(formatDistance(1234), '1,2 km');
+    expect(formatDistance(15400), '15 km');
   });
 }

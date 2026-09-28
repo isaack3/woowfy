@@ -4,8 +4,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../data/models.dart';
 import '../../data/repository.dart';
+import 'email_settings_tab.dart';
 import 'sales_tab.dart';
 import 'stores_tabs.dart';
+import 'users_tab.dart';
+import 'waitlist_tab.dart';
 
 /// Panel interno de Woowfy. Solo para usuarios con `role: admin` en `users/{uid}`
 /// (las reglas de Firestore también lo exigen, esto es solo la puerta de la UI).
@@ -46,12 +49,14 @@ class _AdminShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 6,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Woowfy · Admin'),
           leading: BackButton(onPressed: () => context.go('/')),
           bottom: TabBar(
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
             tabs: [
               Tab(
                 child: StreamBuilder<List<Store>>(
@@ -69,11 +74,14 @@ class _AdminShell extends StatelessWidget {
               ),
               const Tab(text: 'Comercios'),
               const Tab(text: 'Ventas'),
+              const Tab(text: 'Interesados'),
+              const Tab(text: 'Usuarios'),
+              const Tab(text: 'Correo'),
             ],
           ),
         ),
         body: const TabBarView(
-          children: [PendingStoresTab(), StoresTab(), SalesTab()],
+          children: [PendingStoresTab(), StoresTab(), SalesTab(), WaitlistTab(), UsersTab(), EmailSettingsTab()],
         ),
       ),
     );

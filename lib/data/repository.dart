@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 import '../core/backend.dart';
 import 'models.dart';
@@ -12,13 +15,13 @@ class Repository {
   CollectionReference<Map<String, dynamic>> get _bags => _db.collection('bags');
   CollectionReference<Map<String, dynamic>> get _stores => _db.collection('stores');
 
-  /// Bolsas activas cuyo horario de retiro aún no termina.
-  Stream<List<Bag>> watchAvailableBags({String? comuna}) {
-    Query<Map<String, dynamic>> q = _bags.where('active', isEqualTo: true);
-    if (comuna != null) q = q.where('comuna', isEqualTo: comuna);
-    q = q.where('pickupEnd', isGreaterThan: Timestamp.now()).orderBy('pickupEnd');
-    return q.snapshots().map((s) => s.docs.map(Bag.fromDoc).toList());
-  }
+  /// Bolsas activas de todo Chile cuyo horario de retiro aún no termina.
+  Stream<List<Bag>> watchAvailableBags() => _bags
+      .where('active', isEqualTo: true)
+      .where('pickupEnd', isGreaterThan: Timestamp.now())
+      .orderBy('pickupEnd')
+      .snapshots()
+      .map((s) => s.docs.map(Bag.fromDoc).toList());
 
   Stream<Bag?> watchBag(String id) =>
       _bags.doc(id).snapshots().map((d) => d.exists ? Bag.fromDoc(d) : null);
@@ -40,14 +43,18 @@ class Repository {
     required String uid,
     required String? email,
     required String name,
+    required String region,
     required String comuna,
     required String address,
     required String phone,
+    String? category,
   }) {
     return _stores.add({
+      'category': category,
       'ownerUid': uid,
       'ownerEmail': email,
       'name': name,
+      'region': region,
       'comuna': comuna,
       'address': address,
       'phone': phone,
@@ -63,6 +70,32 @@ class Repository {
       });
 
   // --- Admin -------------------------------------------------------------------
+
+  /// El usuario cambia su nombre (las reglas no le dejan tocar su rol).
+  Future<void> updateMyName(String uid, String name) =>
+      _db.doc('users/$uid').set({'name': name}, SetOptions(merge: true));
+
+  // --- Favoritos y notificaciones ---------------------------------------------------
+
+  /// Ids de los locales favoritos del usuario.
+  Stream<Set<String>> watchFavoriteStoreIds(String uid) => _db
+      .collection('users/$uid/favorites')
+      .snapshots()
+      .map((s) => s.docs.map((d) => d.id).toSet());
+
+  Future<void> setFavorite(String uid, {required String storeId, required String storeName, required bool favorite}) {
+    final ref = _db.doc('users/$uid/favorites/$storeId');
+    return favorite
+        ? ref.set({'storeId': storeId, 'storeName': storeName, 'createdAt': FieldValue.serverTimestamp()})
+        : ref.delete();
+  }
+
+  /// Guarda el token de notificaciones push de este navegador/dispositivo.
+  Future<void> addPushToken(String uid, String token) =>
+      _db.doc('users/$uid').set({'fcmTokens': FieldValue.arrayUnion([token])}, SetOptions(merge: true));
+
+  Future<void> removePushToken(String uid, String token) =>
+      _db.doc('users/$uid').set({'fcmTokens': FieldValue.arrayRemove([token])}, SetOptions(merge: true));
 
   Stream<String?> watchRole(String uid) =>
       _db.doc('users/$uid').snapshots().map((d) => d.data()?['role'] as String?);
@@ -90,6 +123,27 @@ class Repository {
     await batch.commit();
   }
 
+  Stream<EmailSettings> watchEmailSettings() =>
+      _db.doc('config/email').snapshots().map((d) => EmailSettings.fromMap(d.data()));
+
+  Future<void> saveEmailSettings(EmailSettings s) => _db.doc('config/email').set({
+        ...s.toMap(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+  /// Envía el correo de bienvenida de prueba al admin conectado. Devuelve el destinatario.
+  Future<String> sendTestEmail() async {
+    final res = await functions.httpsCallable('sendTestEmail').call<Map<String, dynamic>>();
+    return res.data['to'] as String;
+  }
+
+  Stream<List<WaitlistEntry>> watchWaitlist() => _db
+      .collection('waitlist')
+      .orderBy('createdAt', descending: true)
+      .limit(1000)
+      .snapshots()
+      .map((s) => s.docs.map(WaitlistEntry.fromDoc).toList());
+
   /// Todos los pedidos creados desde [since] (para las métricas del panel admin).
   Stream<List<BagOrder>> watchOrdersSince(DateTime since) => _db
       .collection('orders')
@@ -108,11 +162,17 @@ class Repository {
     required int quantity,
     required DateTime pickupStart,
     required DateTime pickupEnd,
+    String? imageUrl,
   }) {
     return _bags.add({
       'storeId': store.id,
       'storeName': store.name,
       'comuna': store.comuna,
+      'region': store.region,
+      'category': store.category,
+      'storeLogoUrl': store.logoUrl,
+      'lat': store.lat,
+      'lng': store.lng,
       'address': store.address,
       'title': title,
       'description': description,
@@ -122,9 +182,81 @@ class Repository {
       'pickupStart': Timestamp.fromDate(pickupStart),
       'pickupEnd': Timestamp.fromDate(pickupEnd),
       'active': true,
+      'imageUrl': ?imageUrl,
       'createdAt': FieldValue.serverTimestamp(),
     });
   }
+
+  /// Sube la foto de una bolsa a Storage (uploads/{uid}/bags/...) y devuelve su URL pública.
+  Future<String> uploadBagImage(String uid, Uint8List bytes, String contentType) =>
+      _upload('uploads/$uid/bags', bytes, contentType);
+
+  /// Sube el logo del local (uploads/{uid}/store/...).
+  Future<String> uploadStoreLogo(String uid, Uint8List bytes, String contentType) =>
+      _upload('uploads/$uid/store', bytes, contentType);
+
+  Future<String> _upload(String folder, Uint8List bytes, String contentType) async {
+    final ext = contentType.split('/').last.replaceAll('jpeg', 'jpg');
+    final ref = FirebaseStorage.instance.ref('$folder/${DateTime.now().millisecondsSinceEpoch}.$ext');
+    await ref.putData(bytes, SettableMetadata(contentType: contentType, cacheControl: 'public, max-age=31536000'));
+    return ref.getDownloadURL();
+  }
+
+  /// El comercio actualiza su perfil (no puede cambiar su estado ni su dueño: lo impiden las reglas).
+  Future<void> updateStoreProfile(String storeId, Map<String, Object?> data) =>
+      _stores.doc(storeId).update({...data, 'updatedAt': FieldValue.serverTimestamp()});
+
+  // --- Bolsas recurrentes ---------------------------------------------------------
+
+  CollectionReference<Map<String, dynamic>> get _templates => _db.collection('bagTemplates');
+
+  Stream<List<BagTemplate>> watchTemplates(String storeId) => _templates
+      .where('storeId', isEqualTo: storeId)
+      .snapshots()
+      .map((s) => s.docs.map(BagTemplate.fromDoc).toList());
+
+  Future<void> saveTemplate({
+    required String storeId,
+    required String title,
+    required String description,
+    required int originalPrice,
+    required int price,
+    required int quantity,
+    required String pickupStart,
+    required String pickupEnd,
+    required List<int> days,
+    String? imageUrl,
+  }) {
+    return _templates.add({
+      'storeId': storeId,
+      'title': title,
+      'description': description,
+      'originalPrice': originalPrice,
+      'price': price,
+      'quantity': quantity,
+      'pickupStart': pickupStart,
+      'pickupEnd': pickupEnd,
+      'days': days,
+      'active': true,
+      'imageUrl': imageUrl,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> setTemplateActive(String id, bool active) => _templates.doc(id).update({'active': active});
+
+  Future<void> deleteTemplate(String id) => _templates.doc(id).delete();
+
+  // --- Usuarios (admin) -------------------------------------------------------------
+
+  Stream<List<AppUser>> watchUsers() => _db
+      .collection('users')
+      .orderBy('createdAt', descending: true)
+      .limit(500)
+      .snapshots()
+      .map((s) => s.docs.map(AppUser.fromDoc).toList());
+
+  Future<void> setUserRole(String uid, String role) => _db.doc('users/$uid').update({'role': role});
 
   Future<void> setBagActive(String bagId, bool active) =>
       _bags.doc(bagId).update({'active': active});

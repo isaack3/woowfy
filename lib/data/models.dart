@@ -9,6 +9,7 @@ class Bag {
     required this.comuna,
     required this.address,
     required this.title,
+    this.region = '',
     required this.description,
     required this.originalPrice,
     required this.price,
@@ -17,12 +18,18 @@ class Bag {
     required this.pickupEnd,
     required this.active,
     this.imageUrl,
+    this.category,
+    this.storeLogoUrl,
+    this.templateId,
+    this.lat,
+    this.lng,
   });
 
   final String id;
   final String storeId;
   final String storeName;
   final String comuna;
+  final String region;
   final String address;
   final String title;
   final String description;
@@ -33,9 +40,23 @@ class Bag {
   final DateTime pickupEnd;
   final bool active;
   final String? imageUrl;
+  final String? category;
+  final String? storeLogoUrl;
+  /// Si la publicó una bolsa recurrente, el id de la plantilla.
+  final String? templateId;
+  final double? lat;
+  final double? lng;
+
+  bool get hasLocation => lat != null && lng != null;
 
   bool get soldOut => quantityAvailable <= 0;
   int get discountPercent => ((1 - price / originalPrice) * 100).round();
+
+  /// El horario de retiro ya empezó y aún no termina.
+  bool get pickupNow {
+    final now = DateTime.now();
+    return !now.isBefore(pickupStart) && now.isBefore(pickupEnd);
+  }
 
   factory Bag.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final d = doc.data()!;
@@ -44,6 +65,7 @@ class Bag {
       storeId: d['storeId'] as String,
       storeName: d['storeName'] as String? ?? '',
       comuna: d['comuna'] as String? ?? '',
+      region: d['region'] as String? ?? '',
       address: d['address'] as String? ?? '',
       title: d['title'] as String? ?? 'Bolsa sorpresa',
       description: d['description'] as String? ?? '',
@@ -54,6 +76,11 @@ class Bag {
       pickupEnd: (d['pickupEnd'] as Timestamp).toDate(),
       active: d['active'] as bool? ?? false,
       imageUrl: d['imageUrl'] as String?,
+      category: d['category'] as String?,
+      storeLogoUrl: d['storeLogoUrl'] as String?,
+      templateId: d['templateId'] as String?,
+      lat: (d['lat'] as num?)?.toDouble(),
+      lng: (d['lng'] as num?)?.toDouble(),
     );
   }
 }
@@ -81,10 +108,17 @@ class Store {
     required this.address,
     required this.ownerUid,
     required this.status,
+    this.region = '',
     this.ownerEmail,
     this.phone,
     this.statusReason,
     this.createdAt,
+    this.category,
+    this.description = '',
+    this.hours = '',
+    this.logoUrl,
+    this.lat,
+    this.lng,
   });
 
   final String id;
@@ -93,11 +127,19 @@ class Store {
   final String address;
   final String ownerUid;
   final StoreStatus status;
+  final String region;
   final String? ownerEmail;
   final String? phone;
   /// Motivo del rechazo o suspensión, visible para el comercio.
   final String? statusReason;
   final DateTime? createdAt;
+  /// Perfil público del local.
+  final String? category;
+  final String description;
+  final String hours;
+  final String? logoUrl;
+  final double? lat;
+  final double? lng;
 
   bool get approved => status == StoreStatus.approved;
 
@@ -110,10 +152,17 @@ class Store {
       address: d['address'] as String? ?? '',
       ownerUid: d['ownerUid'] as String,
       status: StoreStatus.parse(d['status'] as String?),
+      region: d['region'] as String? ?? '',
       ownerEmail: d['ownerEmail'] as String?,
       phone: d['phone'] as String?,
       statusReason: d['statusReason'] as String?,
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
+      category: d['category'] as String?,
+      description: d['description'] as String? ?? '',
+      hours: d['hours'] as String? ?? '',
+      logoUrl: d['logoUrl'] as String?,
+      lat: (d['lat'] as num?)?.toDouble(),
+      lng: (d['lng'] as num?)?.toDouble(),
     );
   }
 }
@@ -147,6 +196,8 @@ class BagOrder {
     required this.pickupCode,
     required this.status,
     this.checkoutUrl,
+    this.imageUrl,
+    this.originalPrice,
     this.platformFee = 0,
     this.createdAt,
   });
@@ -154,6 +205,9 @@ class BagOrder {
   final String id;
   final String bagId;
   final String storeName;
+  final String? imageUrl;
+  /// Valor normal de la bolsa (pedidos creados desde el sprint 2).
+  final int? originalPrice;
   /// Comisión de Woowfy incluida en [amount].
   final int platformFee;
   final DateTime? createdAt;
@@ -182,11 +236,176 @@ class BagOrder {
       pickupCode: d['pickupCode'] as String? ?? '',
       status: OrderStatus.parse(d['status'] as String?),
       checkoutUrl: (d['payment'] as Map<String, dynamic>?)?['checkoutUrl'] as String?,
+      imageUrl: d['imageUrl'] as String?,
+      originalPrice: (d['originalPrice'] as num?)?.toInt(),
       platformFee: (d['platformFee'] as num?)?.toInt() ?? 0,
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
     );
   }
 }
 
-/// Comunas del piloto. Ampliar a medida que se sumen comercios.
-const pilotComunas = ['Providencia', 'Ñuñoa', 'Santiago', 'Las Condes', 'Vitacura'];
+/// Remitente de los correos (documento `config/email`, editable en Admin → Correo).
+class EmailSettings {
+  const EmailSettings({
+    this.enabled = false,
+    this.fromName = 'Woowfy',
+    this.fromEmail = 'hola@woowfy.com',
+    this.replyTo,
+  });
+
+  final bool enabled;
+  final String fromName;
+  final String fromEmail;
+  final String? replyTo;
+
+  factory EmailSettings.fromMap(Map<String, dynamic>? d) {
+    const def = EmailSettings();
+    if (d == null) return def;
+    return EmailSettings(
+      enabled: d['enabled'] as bool? ?? def.enabled,
+      fromName: d['fromName'] as String? ?? def.fromName,
+      fromEmail: d['fromEmail'] as String? ?? def.fromEmail,
+      replyTo: d['replyTo'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+        'enabled': enabled,
+        'fromName': fromName,
+        'fromEmail': fromEmail,
+        'replyTo': replyTo,
+      };
+}
+
+/// Inscripción en la lista de espera de la landing (colección `waitlist`, solo admin).
+class WaitlistEntry {
+  const WaitlistEntry({
+    required this.id,
+    required this.email,
+    this.name = '',
+    this.emailStatus,
+    required this.isMerchant,
+    this.region,
+    this.comuna,
+    this.businessName,
+    this.createdAt,
+  });
+
+  final String id;
+  final String email;
+  final String name;
+  /// Estado del correo de bienvenida: sent | error | skipped (null si aún no se procesa).
+  final String? emailStatus;
+  final String? region;
+  final bool isMerchant;
+  final String? comuna;
+  final String? businessName;
+  final DateTime? createdAt;
+
+  factory WaitlistEntry.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final d = doc.data()!;
+    return WaitlistEntry(
+      id: doc.id,
+      email: d['email'] as String? ?? '',
+      name: d['name'] as String? ?? '',
+      emailStatus: (d['welcomeEmail'] as Map<String, dynamic>?)?['status'] as String?,
+      isMerchant: d['type'] == 'comercio',
+      region: d['region'] as String?,
+      comuna: d['comuna'] as String?,
+      businessName: d['businessName'] as String?,
+      createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
+    );
+  }
+}
+
+
+/// Categorías de locales (filtros del inicio y perfil del comercio).
+const storeCategories = [
+  'Panadería',
+  'Pastelería',
+  'Café',
+  'Restaurante',
+  'Sushi',
+  'Verdulería',
+  'Minimarket',
+  'Otro',
+];
+
+/// Días de la semana para bolsas recurrentes (1 = lunes … 7 = domingo).
+const weekdayShort = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+
+/// Bolsa recurrente (colección `bagTemplates`): se publica sola los días elegidos.
+class BagTemplate {
+  const BagTemplate({
+    required this.id,
+    required this.storeId,
+    required this.title,
+    required this.description,
+    required this.originalPrice,
+    required this.price,
+    required this.quantity,
+    required this.pickupStart,
+    required this.pickupEnd,
+    required this.days,
+    required this.active,
+    this.imageUrl,
+  });
+
+  final String id;
+  final String storeId;
+  final String title;
+  final String description;
+  final int originalPrice;
+  final int price;
+  final int quantity;
+  /// Hora local "HH:mm".
+  final String pickupStart;
+  final String pickupEnd;
+  final List<int> days;
+  final bool active;
+  final String? imageUrl;
+
+  String get daysLabel => days.length == 7 ? 'Todos los días' : ([...days]..sort()).map((d) => weekdayShort[d - 1]).join(' ');
+
+  factory BagTemplate.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final d = doc.data()!;
+    return BagTemplate(
+      id: doc.id,
+      storeId: d['storeId'] as String,
+      title: d['title'] as String? ?? '',
+      description: d['description'] as String? ?? '',
+      originalPrice: (d['originalPrice'] as num).toInt(),
+      price: (d['price'] as num).toInt(),
+      quantity: (d['quantity'] as num).toInt(),
+      pickupStart: d['pickupStart'] as String,
+      pickupEnd: d['pickupEnd'] as String,
+      days: [for (final x in (d['days'] as List? ?? [])) (x as num).toInt()],
+      active: d['active'] as bool? ?? false,
+      imageUrl: d['imageUrl'] as String?,
+    );
+  }
+}
+
+/// Usuario (colección `users`), para Admin → Usuarios.
+class AppUser {
+  const AppUser({required this.id, required this.email, required this.name, required this.role, this.createdAt});
+
+  final String id;
+  final String email;
+  final String name;
+  final String role;
+  final DateTime? createdAt;
+
+  bool get isAdmin => role == 'admin';
+
+  factory AppUser.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final d = doc.data()!;
+    return AppUser(
+      id: doc.id,
+      email: d['email'] as String? ?? '',
+      name: d['name'] as String? ?? '',
+      role: d['role'] as String? ?? 'customer',
+      createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
+    );
+  }
+}

@@ -2,7 +2,7 @@
  * Proveedor de pagos intercambiable.
  *
  * - "mock" (por defecto): simula el checkout dentro de la propia app
- *   (/pago-simulado/:orderId). Sirve para desarrollar sin cuenta de Mercado Pago.
+ *   (/mock-checkout/:orderId). Sirve para desarrollar sin cuenta de Mercado Pago.
  * - "mercadopago": pendiente (ver ROADMAP.md). Creará una preferencia de
  *   Checkout Pro y devolverá su `init_point`; la confirmación llegará por webhook.
  *
@@ -30,7 +30,7 @@ class MockPaymentProvider implements PaymentProvider {
   readonly name = "mock" as const;
 
   async createCheckout(req: CheckoutRequest): Promise<Checkout> {
-    return { url: `/pago-simulado/${req.orderId}`, externalId: `mock_${req.orderId}` };
+    return { url: `/mock-checkout/${req.orderId}`, externalId: `mock_${req.orderId}` };
   }
 }
 

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 900" role="img" aria-label="Woowfy logo">
+    
+    <g transform="translate(310,70) scale(1.75)" stroke="#063B25" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M35 78 Q35 55 58 55 H220 Q243 55 243 78 L235 190 Q234 214 210 217 H67 Q43 214 42 190 Z" fill="#FFF7E3"/>
+      <path d="M234 78 L272 95 L250 198 Q246 219 225 215 L234 78 Z" fill="#9BE52C"/>
+      <path d="M79 58 Q69 18 99 10 Q120 5 126 31 Q138 10 157 19 Q177 28 164 57" fill="#9BE52C"/>
+      <path d="M145 64 Q164 13 197 19 Q222 24 216 52 L196 81 Z" fill="#FF694D"/>
+      <path d="M94 96 Q102 78 114 96 L120 119 L101 130 L85 118 Z" fill="#9BE52C"/>
+      <path d="M98 146 Q106 135 115 146" fill="none"/>
+      <path d="M155 146 Q163 135 172 146" fill="none"/>
+      <path d="M121 170 Q135 184 149 170" fill="none"/>
+      <path d="M24 102 L5 92 M22 126 L0 126 M27 149 L9 160" stroke="#FF694D"/>
+      <path d="M109 23 Q132 3 151 4" fill="none" stroke="#9BE52C"/>
+    </g><text x="400" y="735" text-anchor="middle" font-family="Lato" font-size="150" font-weight="900" letter-spacing="-8" fill="#063B25">woowfy</text></svg>

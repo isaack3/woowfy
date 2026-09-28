@@ -3,10 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/format.dart';
+import '../../core/legal.dart';
+import '../../core/theme.dart';
+import '../../data/chile.dart';
 import '../../data/models.dart';
 import '../../data/repository.dart';
+import '../bags/bag_image.dart';
 import 'publish_bag_dialog.dart';
 import 'redeem_dialog.dart';
+import 'store_profile_dialog.dart';
 
 /// Panel del comercio: solicitar alta, y una vez aprobado, publicar bolsas del día.
 class MerchantPage extends StatelessWidget {
@@ -85,6 +90,21 @@ class _StatusMessage extends StatelessWidget {
             const SizedBox(height: 16),
             const Text('Escríbenos a hola@woowfy.com para más información.'),
           ],
+          // Atajo para quien es admin y dueño a la vez: la aprobación se hace en Admin → Solicitudes.
+          if (store.status == StoreStatus.pending)
+            StreamBuilder<String?>(
+              stream: Repository.instance.watchRole(store.ownerUid),
+              builder: (context, snap) => snap.data != 'admin'
+                  ? const SizedBox.shrink()
+                  : Padding(
+                      padding: const EdgeInsets.only(top: 24),
+                      child: FilledButton.icon(
+                        onPressed: () => context.go('/admin'),
+                        icon: const Icon(Icons.admin_panel_settings_outlined),
+                        label: const Text('Eres admin: revisar solicitudes'),
+                      ),
+                    ),
+            ),
         ],
       ),
     );
@@ -105,7 +125,9 @@ class _StoreRequestFormState extends State<_StoreRequestForm> {
   final _name = TextEditingController();
   final _address = TextEditingController();
   final _phone = TextEditingController();
-  String _comuna = pilotComunas.first;
+  final _comuna = TextEditingController();
+  String? _region;
+  String? _category;
   bool _sending = false;
 
   @override
@@ -113,6 +135,7 @@ class _StoreRequestFormState extends State<_StoreRequestForm> {
     _name.dispose();
     _address.dispose();
     _phone.dispose();
+    _comuna.dispose();
     super.dispose();
   }
 
@@ -125,8 +148,10 @@ class _StoreRequestFormState extends State<_StoreRequestForm> {
         email: FirebaseAuth.instance.currentUser?.email,
         name: _name.text.trim(),
         phone: _phone.text.trim(),
-        comuna: _comuna,
+        region: _region!,
+        comuna: _comuna.text.trim(),
         address: _address.text.trim(),
+        category: _category,
       );
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -152,10 +177,26 @@ class _StoreRequestFormState extends State<_StoreRequestForm> {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
-            initialValue: _comuna,
+            initialValue: _category,
+            decoration: const InputDecoration(labelText: 'Categoría'),
+            items: [for (final c in storeCategories) DropdownMenuItem(value: c, child: Text(c))],
+            onChanged: (v) => setState(() => _category = v),
+            validator: (v) => v == null ? 'Elige una categoría' : null,
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            initialValue: _region,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Región'),
+            items: [for (final r in chileRegions) DropdownMenuItem(value: r, child: Text(r))],
+            onChanged: (v) => setState(() => _region = v),
+            validator: (v) => v == null ? 'Elige una región' : null,
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _comuna,
             decoration: const InputDecoration(labelText: 'Comuna'),
-            items: [for (final c in pilotComunas) DropdownMenuItem(value: c, child: Text(c))],
-            onChanged: (v) => setState(() => _comuna = v!),
+            validator: required,
           ),
           const SizedBox(height: 16),
           TextFormField(
@@ -175,6 +216,8 @@ class _StoreRequestFormState extends State<_StoreRequestForm> {
             onPressed: _sending ? null : _send,
             child: Text(_sending ? 'Enviando…' : 'Enviar solicitud'),
           ),
+          const SizedBox(height: 12),
+          const LegalNotice(prefix: 'Al enviar la solicitud aceptas'),
         ],
       ),
     );
@@ -206,18 +249,23 @@ class _Dashboard extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
             children: [
-              Text(store.name, style: Theme.of(context).textTheme.headlineSmall),
-              Text('${store.address}, ${store.comuna}'),
+              _ProfileCard(store: store),
               const SizedBox(height: 16),
               _ToPickUp(storeId: store.id),
               const SizedBox(height: 24),
-              Text('Tus bolsas', style: Theme.of(context).textTheme.titleMedium),
+              _Templates(storeId: store.id),
+              const SizedBox(height: 24),
+              Text('Bolsas publicadas', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
-              if (bags.isEmpty) const Text('Aún no publicas bolsas. ¡Parte con la de hoy!'),
+              if (bags.isEmpty) const Text('Aún no publicas bolsas. Parte con la de hoy.'),
               for (final bag in bags)
                 Card(
                   child: SwitchListTile(
-                    title: Text('${bag.title} · ${formatClp(bag.price)}'),
+                    secondary: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: SizedBox(width: 52, height: 52, child: BagImage(url: bag.imageUrl, iconSize: 20)),
+                    ),
+                    title: Text('${bag.title} · ${formatClp(bag.price)}${bag.templateId != null ? ' · recurrente' : ''}'),
                     subtitle: Text(
                       '${bag.pickupStart.day}/${bag.pickupStart.month} '
                       '${formatPickupWindow(bag.pickupStart, bag.pickupEnd)} · '
@@ -282,6 +330,121 @@ class _ToPickUp extends StatelessWidget {
           },
         ),
       ),
+    );
+  }
+}
+
+/// Cabecera del panel: logo, nombre, categoría y acceso a editar el perfil.
+class _ProfileCard extends StatelessWidget {
+  const _ProfileCard({required this.store});
+
+  final Store store;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final incomplete = store.category == null || store.logoUrl == null;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              StoreLogo(url: store.logoUrl, size: 56),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(store.name, style: t.titleLarge),
+                  Text(
+                    [store.category, store.comuna].whereType<String>().where((s) => s.isNotEmpty).join(' · '),
+                    style: t.bodySmall?.copyWith(color: WoowfyColors.muted),
+                  ),
+                  if (store.hours.isNotEmpty) Text(store.hours, style: t.bodySmall?.copyWith(color: WoowfyColors.muted)),
+                ]),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => showDialog<void>(context: context, builder: (_) => StoreProfileDialog(store: store)),
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                label: const Text('Editar'),
+              ),
+            ]),
+            if (incomplete) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: WoowfyColors.orangeSoft, borderRadius: BorderRadius.circular(12)),
+                child: const Row(children: [
+                  Icon(Icons.info_outline, size: 18, color: Color(0xFF7A3510)),
+                  SizedBox(width: 8),
+                  Expanded(child: Text('Completa tu perfil (logo y categoría) para que los clientes te encuentren.')),
+                ]),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Bolsas recurrentes del local: se publican solas los días elegidos.
+class _Templates extends StatelessWidget {
+  const _Templates({required this.storeId});
+
+  final String storeId;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return StreamBuilder<List<BagTemplate>>(
+      stream: Repository.instance.watchTemplates(storeId),
+      builder: (context, snap) {
+        final templates = snap.data ?? const <BagTemplate>[];
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Bolsas recurrentes', style: t.titleMedium),
+            const SizedBox(height: 4),
+            Text(
+              templates.isEmpty
+                  ? 'Al publicar, activa "Repetir" y la bolsa se publicará sola los días que elijas.'
+                  : 'Se publican solas cada día a las 5:00 (o apenas las creas, si aún es hora).',
+              style: t.bodySmall?.copyWith(color: WoowfyColors.muted),
+            ),
+            const SizedBox(height: 8),
+            for (final tpl in templates)
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.repeat, color: WoowfyColors.green),
+                  title: Text('${tpl.title} · ${formatClp(tpl.price)}'),
+                  subtitle: Text('${tpl.daysLabel} · ${tpl.pickupStart} – ${tpl.pickupEnd} · ${tpl.quantity} bolsas'),
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Switch(value: tpl.active, onChanged: (v) => Repository.instance.setTemplateActive(tpl.id, v)),
+                    IconButton(
+                      tooltip: 'Eliminar',
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () async {
+                        final ok = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Eliminar bolsa recurrente'),
+                            content: const Text('Dejará de publicarse. Las bolsas ya publicadas hoy se mantienen.'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+                              FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Eliminar')),
+                            ],
+                          ),
+                        );
+                        if (ok == true) await Repository.instance.deleteTemplate(tpl.id);
+                      },
+                    ),
+                  ]),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

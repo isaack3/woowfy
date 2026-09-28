@@ -138,7 +138,7 @@ class _StoreCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 4),
-            Text('${store.address}, ${store.comuna}', style: muted),
+            Text([store.address, store.comuna, store.region].where((s) => s.isNotEmpty).join(', '), style: muted),
             Wrap(
               spacing: 16,
               children: [

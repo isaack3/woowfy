@@ -24,7 +24,7 @@ class _MockCheckoutPageState extends State<MockCheckoutPage> {
     setState(() => _busy = true);
     try {
       await Repository.instance.confirmMockPayment(widget.orderId, approved: approved);
-      if (mounted) context.go('/pedido/${widget.orderId}');
+      if (mounted) context.go('/order/${widget.orderId}');
     } on FirebaseFunctionsException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message ?? e.code)));
@@ -65,7 +65,7 @@ class _MockCheckoutPageState extends State<MockCheckoutPage> {
                   const SizedBox(height: 24),
                   if (order.status != OrderStatus.pendingPayment)
                     FilledButton(
-                      onPressed: () => context.go('/pedido/${order.id}'),
+                      onPressed: () => context.go('/order/${order.id}'),
                       child: Text('Ver pedido (${order.status.label.toLowerCase()})'),
                     )
                   else ...[

@@ -1,0 +1,17 @@
+rules_version = '2';
+
+// Fotos de bolsas: uploads/{uid}/bags/{archivo}
+// Cada usuario solo escribe en su propia carpeta (imágenes de hasta 5 MB); la lectura es pública.
+// Que la foto termine en una bolsa lo controlan las reglas de Firestore (solo un comercio aprobado
+// puede crear bolsas), así estas reglas no necesitan leer Firestore ni permisos extra de IAM.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /uploads/{uid}/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}
