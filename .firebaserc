@@ -1,0 +1,17 @@
+{
+  "projects": {
+    "default": "woowfy-app"
+  },
+  "targets": {
+    "woowfy-app": {
+      "hosting": {
+        "landing": [
+          "woowfy-app"
+        ],
+        "app": [
+          "woowfy-app-web"
+        ]
+      }
+    }
+  }
+}

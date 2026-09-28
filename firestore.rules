@@ -1,0 +1,66 @@
+rules_version = '2';
+
+// Modelo de datos:
+//   users/{uid}        perfil y rol (customer | admin)
+//   stores/{storeId}   comercio; status: pending | approved | rejected | suspended (lo cambia un admin)
+//   bags/{bagId}       bolsa sorpresa publicada por un comercio
+//   orders/{orderId}   compra; solo la crean/actualizan Cloud Functions (pago)
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isAdmin() {
+      return signedIn()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    function ownsApprovedStore(storeId) {
+      let store = get(/databases/$(database)/documents/stores/$(storeId)).data;
+      return signedIn() && store.ownerUid == request.auth.uid && store.status == 'approved';
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      // El usuario no puede auto-asignarse rol distinto de customer.
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.role == 'customer';
+      allow update: if (signedIn() && request.auth.uid == uid
+        && request.resource.data.role == resource.data.role) || isAdmin();
+    }
+
+    match /stores/{storeId} {
+      allow read: if resource.data.status == 'approved'
+        || (signedIn() && resource.data.ownerUid == request.auth.uid)
+        || isAdmin();
+      // Solicitud de alta: queda pendiente hasta que un admin la revise.
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.status == 'pending';
+      // El dueño edita sus datos pero no su estado (salvo reenviar una solicitud rechazada);
+      // el admin aprueba, rechaza o suspende.
+      allow update: if isAdmin() || (signedIn()
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && (request.resource.data.status == resource.data.status
+          || (resource.data.status == 'rejected' && request.resource.data.status == 'pending')));
+    }
+
+    match /bags/{bagId} {
+      allow read: if resource.data.active == true
+        || ownsApprovedStore(resource.data.storeId)
+        || isAdmin();
+      allow create: if ownsApprovedStore(request.resource.data.storeId)
+        && request.resource.data.price > 0
+        && request.resource.data.price < request.resource.data.originalPrice;
+      // El admin puede pausar bolsas (p. ej. al suspender un comercio).
+      allow update: if isAdmin() || (ownsApprovedStore(resource.data.storeId)
+        && request.resource.data.storeId == resource.data.storeId);
+      allow delete: if ownsApprovedStore(resource.data.storeId) || isAdmin();
+    }
+
+    match /orders/{orderId} {
+      allow read: if signedIn() && (resource.data.userUid == request.auth.uid
+        || ownsApprovedStore(resource.data.storeId) || isAdmin());
+      allow write: if false; // Solo Cloud Functions (Admin SDK) tras confirmar el pago.
+    }
+  }
+}

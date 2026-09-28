@@ -1,0 +1,57 @@
+# Builds en la nube con Codemagic (https://codemagic.io).
+# Permite compilar iOS SIN tener un Mac. Aún no se usa: la app parte en web.
+#
+# Antes de activar los workflows móviles:
+#  - Android: sube tu keystore en Codemagic > Team settings > Code signing identities
+#    con la referencia "woowfy_keystore", y crea el grupo de variables "google_play"
+#    con GCLOUD_SERVICE_ACCOUNT_CREDENTIALS (cuenta de servicio de Play Console).
+#  - iOS: Apple Developer Program (USD 99/año) y una clave de App Store Connect API
+#    registrada en Codemagic > Team integrations con el nombre "woowfy_asc".
+
+workflows:
+  android:
+    name: Android (Google Play - pruebas internas)
+    max_build_duration: 60
+    instance_type: linux_x2
+    environment:
+      flutter: stable
+      android_signing:
+        - woowfy_keystore
+      groups:
+        - google_play
+    scripts:
+      - flutter pub get
+      - flutter test
+      - flutter build appbundle --release --build-number=$BUILD_NUMBER
+    artifacts:
+      - build/app/outputs/bundle/release/*.aab
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+        submit_as_draft: true
+
+  ios:
+    name: iOS (TestFlight)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: woowfy_asc
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.woowfy.woowfy
+    scripts:
+      - flutter pub get
+      - flutter test
+      - xcode-project use-profiles
+      - flutter build ipa --release --build-number=$BUILD_NUMBER --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true

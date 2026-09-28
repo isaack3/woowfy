@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "988106397716",
+    "project_id": "woowfy-app",
+    "storage_bucket": "woowfy-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:988106397716:android:db781f965bab44a7c3ef01",
+        "android_client_info": {
+          "package_name": "com.woowfy.woowfy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCo_ZbJll6CeLBr5S7nKOjZVn5sN3aa9aA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

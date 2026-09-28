@@ -1,0 +1,24 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:intl/date_symbol_data_local.dart';
+
+import 'app.dart';
+import 'core/backend.dart';
+import 'firebase_options.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // URLs limpias en web (woowfy.com/bolsa/123 en vez de /#/bolsa/123).
+  usePathUrlStrategy();
+  await initializeDateFormatting('es_CL');
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  if (useEmulators) {
+    await FirebaseAuth.instance.useAuthEmulator('localhost', 9099);
+    FirebaseFirestore.instance.useFirestoreEmulator('localhost', 8080);
+    functions.useFunctionsEmulator('localhost', 5001);
+  }
+  runApp(const WoowfyApp());
+}
