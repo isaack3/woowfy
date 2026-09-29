@@ -274,34 +274,194 @@ class _BankCard extends StatelessWidget {
 
   final String storeId;
 
+  void _edit(BuildContext context, BankAccount? account) => showDialog<void>(
+        context: context,
+        builder: (_) => _BankDialog(storeId: storeId, initial: account),
+      );
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     return StreamBuilder<BankAccount?>(
       stream: Repository.instance.watchBankAccount(storeId),
       builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) return const SizedBox.shrink();
         final account = snap.data;
         return Card(
-          child: ListTile(
-            leading: const Icon(Icons.account_balance_outlined, color: WoowfyColors.green),
-            title: Text(account == null ? 'Agrega tu cuenta para recibir pagos' : account.summary),
-            subtitle: Text(
-              account == null
-                  ? 'Sin estos datos no podemos transferirte tus ventas. Solo los ve el equipo de Woowfy.'
-                  : '${account.holder} · ${account.rut}',
-              style: t.bodySmall,
-            ),
-            trailing: TextButton(
-              onPressed: () => showDialog<void>(
-                context: context,
-                builder: (_) => _BankDialog(storeId: storeId, initial: account),
-              ),
-              child: Text(account == null ? 'Agregar' : 'Editar'),
+          color: account == null ? WoowfyColors.limeSoft : null,
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  const Icon(Icons.account_balance_outlined, color: WoowfyColors.green),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      account == null ? 'Recibe tus ventas en tu cuenta' : 'Cuenta para recibir pagos',
+                      style: t.titleMedium,
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: 16),
+                // Dónde está el local en el camino: sin cuenta, en el paso 1; con cuenta, listo para cobrar.
+                _PayoutFlow(done: account != null),
+                const SizedBox(height: 16),
+                if (account == null) ...[
+                  Text(
+                    'Sin estos datos no podemos transferirte lo que vendes. Toma un minuto.',
+                    style: t.bodyMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: () => _edit(context, null),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Agregar mi cuenta'),
+                  ),
+                ] else
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+                    decoration: BoxDecoration(color: WoowfyColors.cream, borderRadius: BorderRadius.circular(14)),
+                    child: Row(children: [
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(account.summary, style: t.bodyLarge?.copyWith(fontWeight: FontWeight.w700)),
+                          Text('${account.holder} · ${account.rut}', style: t.bodySmall),
+                        ]),
+                      ),
+                      TextButton(onPressed: () => _edit(context, account), child: const Text('Editar')),
+                    ]),
+                  ),
+                const SizedBox(height: 10),
+                Row(children: [
+                  const Icon(Icons.lock_outline, size: 14, color: WoowfyColors.muted),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text('Privada: solo la ve el equipo de Woowfy para transferirte.',
+                        style: t.bodySmall?.copyWith(color: WoowfyColors.muted)),
+                  ),
+                ]),
+              ],
             ),
           ),
         );
       },
     );
+  }
+}
+
+/// Los 3 pasos de cómo le llega la plata al local, con la línea de avance en verde y lima.
+class _PayoutFlow extends StatelessWidget {
+  const _PayoutFlow({required this.done});
+
+  /// true cuando el local ya registró su cuenta (el paso 1 queda completo).
+  final bool done;
+
+  static const _steps = [
+    (Icons.account_balance_outlined, 'Agrega tu cuenta', 'Titular, RUT, banco y número'),
+    (Icons.qr_code_scanner, 'Vende y entrega', 'Cada bolsa pagada suma a "Por recibir"'),
+    (Icons.payments_outlined, 'Te transferimos', 'Cada semana, ya descontada la comisión'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return LayoutBuilder(builder: (context, c) {
+      final narrow = c.maxWidth < 460;
+      final items = [
+        for (var i = 0; i < _steps.length; i++)
+          _Step(
+            number: i + 1,
+            icon: _steps[i].$1,
+            title: _steps[i].$2,
+            text: _steps[i].$3,
+            state: i == 0 ? (done ? _StepState.done : _StepState.current) : (done && i == 1 ? _StepState.current : _StepState.next),
+            narrow: narrow,
+            t: t,
+          ),
+      ];
+      if (narrow) {
+        return Column(children: [
+          for (var i = 0; i < items.length; i++) ...[
+            items[i],
+            if (i < items.length - 1)
+              Padding(
+                padding: const EdgeInsets.only(left: 19),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(width: 2, height: 14, color: WoowfyColors.green.withValues(alpha: 0.25)),
+                ),
+              ),
+          ],
+        ]);
+      }
+      return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        for (var i = 0; i < items.length; i++) ...[
+          Expanded(child: items[i]),
+          if (i < items.length - 1)
+            Padding(
+              padding: const EdgeInsets.only(top: 19),
+              child: Icon(Icons.arrow_forward, size: 18, color: WoowfyColors.green.withValues(alpha: 0.4)),
+            ),
+        ],
+      ]);
+    });
+  }
+}
+
+enum _StepState { done, current, next }
+
+class _Step extends StatelessWidget {
+  const _Step({
+    required this.number,
+    required this.icon,
+    required this.title,
+    required this.text,
+    required this.state,
+    required this.narrow,
+    required this.t,
+  });
+
+  final int number;
+  final IconData icon;
+  final String title;
+  final String text;
+  final _StepState state;
+  final bool narrow;
+  final TextTheme t;
+
+  @override
+  Widget build(BuildContext context) {
+    final (bg, fg) = switch (state) {
+      _StepState.done => (WoowfyColors.green, WoowfyColors.lime),
+      _StepState.current => (WoowfyColors.lime, WoowfyColors.green),
+      _StepState.next => (Colors.white, WoowfyColors.muted),
+    };
+    final circle = Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: bg,
+        shape: BoxShape.circle,
+        border: state == _StepState.next ? Border.all(color: WoowfyColors.line, width: 1.5) : null,
+      ),
+      child: Icon(state == _StepState.done ? Icons.check : icon, size: 20, color: fg),
+    );
+    final label = Column(
+      crossAxisAlignment: narrow ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+      children: [
+        Text('$number. $title',
+            textAlign: narrow ? TextAlign.start : TextAlign.center,
+            style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w800, color: WoowfyColors.green)),
+        Text(text,
+            textAlign: narrow ? TextAlign.start : TextAlign.center,
+            style: t.bodySmall?.copyWith(color: WoowfyColors.muted)),
+      ],
+    );
+    return narrow
+        ? Row(children: [circle, const SizedBox(width: 12), Expanded(child: label)])
+        : Column(children: [circle, const SizedBox(height: 8), label]);
   }
 }
 
@@ -369,6 +529,12 @@ class _BankDialogState extends State<_BankDialog> {
           key: _form,
           child: SingleChildScrollView(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text(
+                'Aquí te transferimos lo que vendes cada semana, ya descontada la comisión. '
+                'Revisa bien el número: un error puede atrasar tu pago.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: WoowfyColors.muted),
+              ),
+              const SizedBox(height: 8),
               TextFormField(
                 controller: _holder,
                 maxLength: 100,

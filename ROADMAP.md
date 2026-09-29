@@ -135,7 +135,8 @@ y desplegada el 28-09; datos de producción migrados
 - [x] Decidido: **sí se le paga al local si el cliente no retira**. Pasado el horario (+60 min) el pedido queda
       "No retirado" (función `markNoShows`, cada 30 min), sin reembolso, y entra en la liquidación
 - [x] "Liquidar todos" (Admin → Comercios) + planilla CSV con titular, RUT, banco, cuenta y monto por local
-- [x] Datos bancarios del local en "Ventas y pagos" (privados: solo el dueño y el admin)
+- [x] Datos bancarios del local en "Ventas y pagos" (privados: solo el dueño y el admin), con flujo visual de 3 pasos
+      (Agrega tu cuenta → Vende y entrega → Te transferimos) también en la guía para comercios
 
 **Etapa C — Piloto ✅** (salvo el correo de lanzamiento, que espera a Resend)
 - [x] Correos de compra (con código de retiro) y de reembolso (con motivo): función `onOrderUpdated`, interruptor
@@ -154,6 +155,9 @@ y desplegada el 28-09; datos de producción migrados
 - [ ] Empleados por local, reclamos y moderación de opiniones, invitar amigos (referidos)
 
 ### Pendiente (depende de ti)
+- [ ] 🔐 **Google muestre "Woowfy" al iniciar sesión:** (1) agregar `https://app.woowfy.com/__/auth/handler` como URI de
+      redirección del cliente OAuth web y avisar para cambiar `authDomain` a `app.woowfy.com`; (2) verificar la marca
+      en Google Auth Platform → Branding (nombre, logo, woowfy.com, /privacy, /terms)
 - [ ] 📷 Probar el escáner QR nuevo en iPhone (Safari) con una compra de prueba
 - [ ] 💸 Probar la liquidación: cuenta bancaria en *Ventas y pagos* y Admin → Comercios → "Liquidar todos"
 - [ ] ✏️ Confirmar en la guía para comercios "pago semanal" y "aprobación en 1 día hábil" (y en los términos)
