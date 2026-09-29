@@ -51,7 +51,9 @@ class DefaultFirebaseOptions {
     appId: '1:988106397716:web:da5dd16f6ed38741c3ef01',
     messagingSenderId: '988106397716',
     projectId: 'woowfy-app',
-    authDomain: 'woowfy-app.firebaseapp.com',
+    // Dominio propio: Google muestra "Ir a app.woowfy.com" y el inicio de sesión es del mismo sitio (mejor en Safari).
+    // Requiere https://app.woowfy.com/__/auth/handler en las URIs de redirección del cliente OAuth web.
+    authDomain: 'app.woowfy.com',
     storageBucket: 'woowfy-app.firebasestorage.app',
   );
 

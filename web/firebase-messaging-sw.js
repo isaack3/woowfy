@@ -8,7 +8,7 @@ firebase.initializeApp({
   appId: '1:988106397716:web:da5dd16f6ed38741c3ef01',
   messagingSenderId: '988106397716',
   projectId: 'woowfy-app',
-  authDomain: 'woowfy-app.firebaseapp.com',
+  authDomain: 'app.woowfy.com',
   storageBucket: 'woowfy-app.firebasestorage.app',
 });
 
