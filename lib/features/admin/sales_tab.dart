@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/format.dart';
+import '../../core/theme.dart';
 import '../../data/models.dart';
 import '../../data/repository.dart';
 
@@ -71,7 +72,15 @@ class _SalesTabState extends State<SalesTab> {
                         : '${o.createdAt!.day}/${o.createdAt!.month} '
                             '${o.createdAt!.hour.toString().padLeft(2, '0')}:'
                             '${o.createdAt!.minute.toString().padLeft(2, '0')} · ${o.status.label}'),
-                    trailing: Text(formatClp(o.amount)),
+                    trailing: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(formatClp(o.amount)),
+                        Text('Comisión ${formatClp(o.platformFee)}',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: WoowfyColors.muted)),
+                      ],
+                    ),
                   ),
                 ),
             ],
@@ -102,7 +111,7 @@ class _Kpis extends StatelessWidget {
       children: [
         _Kpi(label: 'Bolsas vendidas', value: '${sold.length}'),
         _Kpi(label: 'Ventas totales', value: formatClp(gmv)),
-        _Kpi(label: 'Comisión Woowfy', value: formatClp(fees), highlight: true),
+        _Kpi(label: 'Comisión Woowfy', value: formatClp(fees), caption: '$platformFeePercent de cada venta', highlight: true),
         _Kpi(label: 'Retiradas', value: sold.isEmpty ? '–' : '${(pickedUp * 100 / sold.length).round()}%'),
         _Kpi(label: 'Canceladas', value: '$cancelled'),
       ],
@@ -111,10 +120,11 @@ class _Kpis extends StatelessWidget {
 }
 
 class _Kpi extends StatelessWidget {
-  const _Kpi({required this.label, required this.value, this.highlight = false});
+  const _Kpi({required this.label, required this.value, this.caption, this.highlight = false});
 
   final String label;
   final String value;
+  final String? caption;
   final bool highlight;
 
   @override
@@ -133,6 +143,10 @@ class _Kpi extends StatelessWidget {
               Text(label, style: t.bodySmall),
               const SizedBox(height: 6),
               Text(value, style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+              if (caption != null) ...[
+                const SizedBox(height: 2),
+                Text(caption!, style: t.bodySmall?.copyWith(color: WoowfyColors.muted)),
+              ],
             ],
           ),
         ),

@@ -218,6 +218,7 @@ class BagOrder {
     this.rating,
     this.payoutId,
     this.createdAt,
+    this.paidAt,
   });
 
   final String id;
@@ -241,6 +242,7 @@ class BagOrder {
   /// Liquidación en la que se le pagó este pedido al comercio.
   final String? payoutId;
   final DateTime? createdAt;
+  final DateTime? paidAt;
   final String address;
   final String comuna;
   final String bagTitle;
@@ -276,7 +278,15 @@ class BagOrder {
       rating: (d['rating'] as num?)?.toInt(),
       payoutId: d['payoutId'] as String?,
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
+      paidAt: (d['paidAt'] as Timestamp?)?.toDate(),
     );
+  }
+
+  /// Hasta cuándo el cliente puede cancelar con reembolso: 2 h antes del retiro o 15 min después de pagar.
+  DateTime get cancelDeadline {
+    final beforePickup = pickupStart.subtract(const Duration(hours: cancelHoursBefore));
+    final grace = paidAt?.add(const Duration(minutes: cancelGraceMinutes));
+    return grace != null && grace.isAfter(beforePickup) ? grace : beforePickup;
   }
 }
 
@@ -448,6 +458,19 @@ class AppUser {
 
 /// Horas antes del inicio del retiro hasta las que el cliente puede cancelar (igual que en /terms y en el servidor).
 const cancelHoursBefore = 2;
+
+/// Comisión de Woowfy sobre cada venta. Debe ser igual a PLATFORM_FEE_RATE en functions/src/orders.ts.
+const platformFeeRate = 0.25;
+
+/// "25%" (comisión de Woowfy) y "75%" (lo que recibe el local), para mostrarlos en la app.
+String get platformFeePercent => '${(platformFeeRate * 100).round()}%';
+String get storeSharePercent => '${100 - (platformFeeRate * 100).round()}%';
+
+/// Lo que recibe el local por una venta de [price] (misma cuenta que el servidor).
+int storeShareOf(int price) => price - (price * platformFeeRate).round();
+
+/// Minutos después de pagar en los que el cliente se puede arrepentir (con reembolso), igual que en el servidor.
+const cancelGraceMinutes = 15;
 
 /// "4,6" para mostrar notas.
 String formatRating(double v) => v.toStringAsFixed(1).replaceAll('.', ',');

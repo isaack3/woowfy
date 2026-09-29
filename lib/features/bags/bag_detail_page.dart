@@ -183,6 +183,11 @@ class _Detail extends StatelessWidget {
                         if (!bag.soldOut) Text('Quedan ${bag.quantityAvailable}', style: t.labelLarge),
                       ],
                     ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'El local recibe el $storeSharePercent del precio y Woowfy, una comisión de $platformFeePercent por la plataforma.',
+                      style: t.bodySmall?.copyWith(color: WoowfyColors.muted),
+                    ),
                   ],
                 ),
               ),

@@ -4,8 +4,8 @@ import { defineSecret } from "firebase-functions/params";
 /**
  * Proveedor de pagos intercambiable (PAYMENTS_PROVIDER en functions/.env).
  *
- * - "mock" (por defecto): checkout simulado dentro de la app (/mock-checkout/:orderId). No mueve dinero.
- * - "mercadopago": Checkout Pro. createCheckout crea una "preferencia" y devuelve su URL de pago;
+ * - "mock": checkout simulado dentro de la app (/mock-checkout/:orderId). No mueve dinero.
+ * - "mercadopago" (el activo hoy): Checkout Pro. createCheckout crea una "preferencia" y devuelve su URL de pago;
  *   la confirmación llega al webhook `mercadoPagoWebhook`. Usa las credenciales guardadas en
  *   Secret Manager (MP_ACCESS_TOKEN, MP_WEBHOOK_SECRET): con credenciales de PRUEBA no se cobra nada real.
  */
@@ -107,6 +107,14 @@ class MercadoPagoProvider implements PaymentProvider {
     return this.api<{ id: number; status: string; external_reference?: string; transaction_amount: number }>(
       `/v1/payments/${paymentId}`,
     );
+  }
+
+  /** Último pago aprobado de un pedido (por external_reference). Sirve si el aviso del webhook no llegó. */
+  async findApprovedPayment(orderId: string) {
+    const r = await this.api<{ results?: Array<{ id: number; status: string; external_reference?: string; transaction_amount: number }> }>(
+      `/v1/payments/search?external_reference=${encodeURIComponent(orderId)}&status=approved&sort=date_created&criteria=desc&limit=1`,
+    );
+    return r.results?.[0] ?? null;
   }
 }
 

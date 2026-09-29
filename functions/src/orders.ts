@@ -14,6 +14,10 @@ const PAYMENT_TIMEOUT_MINUTES = 15;
 const REDEEM_GRACE_MINUTES = 60;
 /** El cliente puede cancelar (con reembolso) hasta estas horas antes del inicio del retiro (ver /terms). */
 export const CANCEL_HOURS_BEFORE = 2;
+/** Arrepentimiento: el cliente también puede cancelar (con reembolso) hasta estos minutos después de pagar. */
+export const CANCEL_GRACE_MINUTES = 15;
+/** Reservas sin pagar que puede tener una persona al mismo tiempo. */
+const MAX_PENDING_ORDERS = 2;
 
 // Sin caracteres ambiguos (0/O, 1/I/L) para que se pueda dictar o tipear.
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -41,6 +45,14 @@ export const createOrder = onCall({ secrets: PAYMENT_SECRETS }, async (req) => {
   const orderRef = db.collection("orders").doc();
   const bagRef = db.collection("bags").doc(bagId);
 
+  // Evita que una cuenta acapare bolsas con reservas que no paga.
+  const unpaid = await db.collection("orders")
+    .where("userUid", "==", uid).where("status", "==", "pending_payment").limit(MAX_PENDING_ORDERS).get();
+  if (unpaid.size >= MAX_PENDING_ORDERS) {
+    throw new HttpsError("resource-exhausted",
+      `Tienes ${MAX_PENDING_ORDERS} reservas sin pagar. Págalas o cancélalas antes de reservar otra.`);
+  }
+
   const order = await db.runTransaction(async (tx) => {
     const snap = await tx.get(bagRef);
     const bag = snap.data();
@@ -48,6 +60,25 @@ export const createOrder = onCall({ secrets: PAYMENT_SECRETS }, async (req) => {
     if (!bag || !bag.active || bag.quantityAvailable < 1 || bag.pickupEnd.toMillis() <= now.toMillis()) {
       throw new HttpsError("failed-precondition", "Esta bolsa ya no está disponible.");
     }
+    const store = (await tx.get(db.collection("stores").doc(bag.storeId))).data();
+    if (store?.status !== "approved") throw new HttpsError("failed-precondition", "Este local no está disponible.");
+    if (!(bag.price > 0 && bag.price < bag.originalPrice)) {
+      throw new HttpsError("failed-precondition", "Esta bolsa tiene un precio no válido.");
+    }
+    // El código de retiro es único por local mientras el pedido esté vigente. Se guarda aparte del pedido para
+    // que el comercio no lo pueda leer: solo lo ve el cliente, y el comercio lo valida cuando se lo muestran.
+    let code = "";
+    let codeRef = db.collection("pickupCodes").doc();
+    for (let i = 0; i < 5 && !code; i++) {
+      const candidate = pickupCode();
+      const ref = db.collection("pickupCodes").doc(`${bag.storeId}_${candidate}`);
+      const taken = (await tx.get(ref)).data();
+      if (!taken || taken.pickupEnd.toMillis() + REDEEM_GRACE_MINUTES * 60_000 < now.toMillis()) {
+        code = candidate;
+        codeRef = ref;
+      }
+    }
+    if (!code) throw new HttpsError("unavailable", "No pudimos reservar. Intenta de nuevo.");
     const amount: number = bag.price;
     const platformFee = Math.round(amount * PLATFORM_FEE_RATE);
     const data = {
@@ -65,13 +96,14 @@ export const createOrder = onCall({ secrets: PAYMENT_SECRETS }, async (req) => {
       storeAmount: amount - platformFee,
       pickupStart: bag.pickupStart,
       pickupEnd: bag.pickupEnd,
-      pickupCode: pickupCode(),
       status: "pending_payment",
       expiresAt: Timestamp.fromMillis(now.toMillis() + PAYMENT_TIMEOUT_MINUTES * 60_000),
       createdAt: FieldValue.serverTimestamp(),
     };
     tx.update(bagRef, { quantityAvailable: FieldValue.increment(-1) });
     tx.set(orderRef, data);
+    tx.set(orderRef.collection("private").doc("pickup"), { code, userUid: uid });
+    tx.set(codeRef, { orderId: orderRef.id, storeId: bag.storeId, pickupEnd: bag.pickupEnd });
     return data;
   });
 
@@ -111,6 +143,46 @@ export async function markOrderPaid(orderId: string, externalPaymentId: string):
     return "noop"; // idempotente: los webhooks se repiten
   });
 }
+
+/** Marca el pedido como pagado; si la reserva ya había vencido, reembolsa el pago. */
+async function applyApprovedPayment(orderId: string, paymentId: string, amount: number): Promise<"paid" | "late" | "noop"> {
+  // Misma verificación para el webhook y la conciliación: el pago debe cubrir el monto del pedido.
+  const order = (await getFirestore().collection("orders").doc(orderId).get()).data();
+  if (!order || Number(amount) < Number(order.amount)) {
+    logger.error("Pago aprobado que no calza con el pedido", { orderId, paymentId, amount });
+    return "noop";
+  }
+  const result = await markOrderPaid(orderId, paymentId);
+  if (result === "late") {
+    await getFirestore().collection("orders").doc(orderId).update({ refund: { status: "pending", amount } });
+    await refundOrder(orderId);
+  }
+  return result;
+}
+
+/**
+ * Red de seguridad por si el aviso del webhook no llega: el servidor le pregunta a Mercado Pago, con nuestro
+ * token, si el pedido tiene un pago aprobado. No usa ningún dato enviado por el cliente.
+ */
+async function reconcileOrder(orderId: string): Promise<"paid" | "late" | "noop" | "none"> {
+  if (paymentProvider().name !== "mercadopago") return "none";
+  const payment = await mercadoPago().findApprovedPayment(orderId);
+  if (!payment || payment.external_reference !== orderId) return "none";
+  const result = await applyApprovedPayment(orderId, String(payment.id), payment.transaction_amount);
+  if (result !== "noop") logger.info("Pedido conciliado con Mercado Pago", { orderId, paymentId: payment.id, result });
+  return result;
+}
+
+/** El cliente vuelve de pagar (o toca "Ya pagué"): verificamos el pago sin esperar al webhook. */
+export const syncOrderPayment = onCall({ secrets: PAYMENT_SECRETS }, async (req) => {
+  const uid = requireUid(req.auth?.uid);
+  const orderId = String(req.data?.orderId ?? "");
+  const order = orderId ? (await getFirestore().collection("orders").doc(orderId).get()).data() : undefined;
+  if (!order || order.userUid !== uid) throw new HttpsError("not-found", "Pedido no encontrado.");
+  if (order.status !== "pending_payment") return { status: order.status };
+  const result = await reconcileOrder(orderId);
+  return { status: result === "paid" ? "paid" : "pending_payment" };
+});
 
 /** Reembolsa un pedido cancelado que ya estaba pagado y deja registro del resultado. */
 async function refundOrder(orderId: string): Promise<void> {
@@ -175,9 +247,11 @@ export const cancelOrder = onCall({ secrets: PAYMENT_SECRETS }, async (req) => {
   }
   if (order.status !== "paid") throw new HttpsError("failed-precondition", "Este pedido ya no se puede cancelar.");
   const limit = order.pickupStart.toMillis() - CANCEL_HOURS_BEFORE * 3600_000;
-  if (Date.now() > limit) {
+  const grace = order.paidAt ? order.paidAt.toMillis() + CANCEL_GRACE_MINUTES * 60_000 : 0;
+  if (Date.now() > Math.max(limit, grace)) {
     throw new HttpsError("failed-precondition",
-      `Solo puedes cancelar hasta ${CANCEL_HOURS_BEFORE} horas antes del inicio del retiro.`);
+      `Solo puedes cancelar hasta ${CANCEL_HOURS_BEFORE} horas antes del inicio del retiro ` +
+      `o dentro de ${CANCEL_GRACE_MINUTES} minutos después de pagar.`);
   }
   await db.runTransaction(async (tx) => {
     const fresh = (await tx.get(ref)).data();
@@ -209,17 +283,27 @@ export const cancelBag = onCall({ secrets: PAYMENT_SECRETS }, async (req) => {
     .where("status", "in", ["pending_payment", "paid"]).get();
   let refunded = 0;
   for (const d of orders.docs) {
-    const o = d.data();
-    const wasPaid = o.status === "paid";
-    await d.ref.update({
-      status: "cancelled", cancelReason: "store", storeMessage: reason, cancelledAt: FieldValue.serverTimestamp(),
-      ...(wasPaid ? { refund: { status: "pending", amount: o.amount } } : {}),
+    // Se relee el estado dentro de una transacción: si el pago se confirmó recién, se cancela como pagado y se
+    // reembolsa (si no, quedaría cancelado con el dinero cobrado). Un pago que llegue después lo reembolsa
+    // markOrderPaid como "late".
+    const o = await db.runTransaction(async (tx) => {
+      const fresh = (await tx.get(d.ref)).data();
+      if (!fresh || !["pending_payment", "paid"].includes(fresh.status)) return null;
+      const wasPaid = fresh.status === "paid";
+      tx.update(d.ref, {
+        status: "cancelled", cancelReason: "store", storeMessage: reason, cancelledAt: FieldValue.serverTimestamp(),
+        ...(wasPaid ? { refund: { status: "pending", amount: fresh.amount } } : {}),
+      });
+      return { wasPaid, userUid: fresh.userUid as string, storeName: fresh.storeName as string, amount: fresh.amount as number };
     });
-    if (wasPaid) {
-      await refundOrder(d.id);
-      refunded++;
+    if (!o?.wasPaid) continue;
+    await refundOrder(d.id);
+    refunded++;
+    try {
       await pushToUser(o.userUid, `${o.storeName} canceló tu bolsa`,
         `${reason} Te devolvimos $${Number(o.amount).toLocaleString("es-CL")}.`, `/order/${d.id}`);
+    } catch (e) {
+      logger.warn("No se pudo avisar la cancelación", { orderId: d.id, error: String(e) });
     }
   }
   return { cancelledOrders: orders.size, refunded };
@@ -265,11 +349,7 @@ export const mercadoPagoWebhook = onRequest({ secrets: PAYMENT_SECRETS }, async 
     return;
   }
   if (payment.status === "approved") {
-    const result = await markOrderPaid(orderId, String(payment.id));
-    if (result === "late") {
-      await getFirestore().collection("orders").doc(orderId).update({ refund: { status: "pending", amount: payment.transaction_amount } });
-      await refundOrder(orderId);
-    }
+    await applyApprovedPayment(orderId, String(payment.id), payment.transaction_amount);
   } else if (["rejected", "cancelled"].includes(payment.status)) {
     await cancelPendingOrder(orderId, "payment_rejected");
   }
@@ -288,15 +368,15 @@ export const redeemOrder = onCall(async (req) => {
   if (stores.empty) throw new HttpsError("permission-denied", "No tienes un local aprobado.");
   const storeId = stores.docs[0].id;
 
-  const matches = await db.collection("orders")
-    .where("storeId", "==", storeId).where("pickupCode", "==", code).limit(5).get();
+  // El código vive en pickupCodes/{storeId}_{código}, que solo lee el servidor.
+  const lookup = (await db.collection("pickupCodes").doc(`${storeId}_${code}`).get()).data();
+  const doc = lookup ? await db.collection("orders").doc(lookup.orderId).get() : null;
   const now = Date.now();
-  const doc = matches.docs.find((d) => d.data().status === "paid");
-  if (!doc) {
-    const redeemed = matches.docs.some((d) => d.data().status === "picked_up");
+  if (!doc?.exists || doc.data()?.storeId !== storeId || doc.data()?.status !== "paid") {
+    const redeemed = doc?.data()?.status === "picked_up";
     throw new HttpsError("not-found", redeemed ? "Este pedido ya fue retirado." : "Código no válido.");
   }
-  const order = doc.data();
+  const order = doc.data()!;
   if (order.pickupEnd.toMillis() + REDEEM_GRACE_MINUTES * 60_000 < now) {
     throw new HttpsError("failed-precondition", "El horario de retiro de este pedido ya terminó.");
   }
@@ -317,11 +397,20 @@ export const expirePendingOrders = onSchedule({
   schedule: "every 5 minutes",
   region: "southamerica-east1",
   timeZone: "America/Santiago",
+  secrets: PAYMENT_SECRETS,
 }, async () => {
   const expired = await getFirestore().collection("orders")
     .where("status", "==", "pending_payment")
     .where("expiresAt", "<", Timestamp.now())
     .limit(200)
     .get();
-  await Promise.all(expired.docs.map((d) => cancelPendingOrder(d.id, "payment_timeout")));
+  await Promise.all(expired.docs.map(async (d) => {
+    // Antes de liberar la bolsa, confirmamos que no haya un pago aprobado cuyo aviso se perdió.
+    try {
+      if ((await reconcileOrder(d.id)) === "paid") return;
+    } catch (e) {
+      logger.warn("No se pudo consultar el pago antes de vencer la reserva", { orderId: d.id, error: String(e) });
+    }
+    await cancelPendingOrder(d.id, "payment_timeout");
+  }));
 });

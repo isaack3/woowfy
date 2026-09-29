@@ -31,6 +31,12 @@ class Repository {
     return res.data['refunded'] as bool? ?? false;
   }
 
+  /// Pide al servidor verificar con Mercado Pago si el pedido ya se pagó. Devuelve true si quedó pagado.
+  Future<bool> syncOrderPayment(String orderId) async {
+    final res = await functions.httpsCallable('syncOrderPayment').call<Map<String, dynamic>>({'orderId': orderId});
+    return res.data['status'] == 'paid';
+  }
+
   /// El comercio cancela la bolsa del día (reembolsa y avisa a quienes la compraron).
   Future<int> cancelBag(String bagId, String reason) async {
     final res = await functions.httpsCallable('cancelBag').call<Map<String, dynamic>>({'bagId': bagId, 'reason': reason});
@@ -98,7 +104,6 @@ class Repository {
 
   Future<void> requestStore({
     required String uid,
-    required String? email,
     required String name,
     required String region,
     required String comuna,
@@ -109,7 +114,6 @@ class Repository {
     return _stores.add({
       'category': category,
       'ownerUid': uid,
-      'ownerEmail': email,
       'name': name,
       'region': region,
       'comuna': comuna,
@@ -336,6 +340,18 @@ class Repository {
     final res = await functions.httpsCallable('redeemOrder').call<Map<String, dynamic>>({'code': code});
     return res.data['bagTitle'] as String;
   }
+
+  /// Código de retiro del pedido: está en un documento que solo puede leer el cliente.
+  Stream<String?> watchPickupCode(String orderId) => _orders
+      .doc(orderId)
+      .collection('private')
+      .doc('pickup')
+      .snapshots()
+      .map((d) => d.data()?['code'] as String?);
+
+  /// Correo de una cuenta (lo usa el admin para contactar al dueño de un local).
+  Future<String?> userEmail(String uid) async =>
+      (await _db.doc('users/$uid').get()).data()?['email'] as String?;
 
   Stream<BagOrder?> watchOrder(String id) =>
       _orders.doc(id).snapshots().map((d) => d.exists ? BagOrder.fromDoc(d) : null);

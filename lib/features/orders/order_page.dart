@@ -70,9 +70,10 @@ class _Body extends StatelessWidget {
 
     switch (order.status) {
       case OrderStatus.paid:
-        final canCancel = DateTime.now().isBefore(
-          order.pickupStart.subtract(const Duration(hours: cancelHoursBefore)),
-        );
+        final deadline = order.cancelDeadline;
+        final canCancel = DateTime.now().isBefore(deadline);
+        final deadlineText =
+            '${deadline.hour.toString().padLeft(2, '0')}:${deadline.minute.toString().padLeft(2, '0')}';
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -83,39 +84,26 @@ class _Body extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            Center(
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                // El QR contiene solo el código, así el comercio puede escanearlo o tipearlo.
-                child: QrImageView(data: order.pickupCode, size: 220),
-              ),
-            ),
-            const SizedBox(height: 16),
-            SelectableText(
-              order.pickupCode,
-              textAlign: TextAlign.center,
-              style: t.displaySmall?.copyWith(
-                letterSpacing: 8,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            _PickupCode(order: order),
             const SizedBox(height: 8),
             Text(pickup, textAlign: TextAlign.center, style: t.titleMedium),
             const SizedBox(height: 24),
-            if (canCancel)
+            if (canCancel) ...[
+              Text(
+                'Puedes cancelar con reembolso hasta las $deadlineText.',
+                textAlign: TextAlign.center,
+                style: t.bodySmall?.copyWith(color: WoowfyColors.muted),
+              ),
               TextButton.icon(
                 onPressed: () => _cancel(context, paid: true),
                 icon: const Icon(Icons.cancel_outlined),
                 label: const Text('Cancelar pedido'),
                 style: TextButton.styleFrom(foregroundColor: scheme.error),
-              )
-            else
+              ),
+            ] else
               Text(
-                'Ya no se puede cancelar: el plazo es hasta $cancelHoursBefore horas antes del retiro.',
+                'Ya no se puede cancelar: el plazo es hasta $cancelHoursBefore horas antes del retiro '
+                'o $cancelGraceMinutes minutos después de pagar.',
                 textAlign: TextAlign.center,
                 style: t.bodySmall?.copyWith(color: WoowfyColors.muted),
               ),
@@ -135,6 +123,7 @@ class _Body extends StatelessWidget {
                 onPressed: () => openCheckout(context, order.checkoutUrl!),
                 child: const Text('Completar pago'),
               ),
+            _VerifyPayment(orderId: order.id),
             TextButton(
               onPressed: () => _cancel(context, paid: false),
               child: const Text('Cancelar reserva'),
@@ -241,6 +230,102 @@ class _Body extends StatelessWidget {
         SnackBar(content: Text(e.message ?? 'No se pudo cancelar.')),
       );
     }
+  }
+}
+
+/// QR y código de retiro. El código está en un documento privado del cliente (el comercio no lo puede leer);
+/// los pedidos antiguos lo traen en el mismo pedido.
+class _PickupCode extends StatelessWidget {
+  const _PickupCode({required this.order});
+
+  final BagOrder order;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return StreamBuilder<String?>(
+      stream: Repository.instance.watchPickupCode(order.id),
+      builder: (context, snap) {
+        final code = snap.data ?? (order.pickupCode.isEmpty ? null : order.pickupCode);
+        if (code == null) {
+          return const SizedBox(height: 252, child: Center(child: CircularProgressIndicator()));
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                // El QR contiene solo el código, así el comercio puede escanearlo o tipearlo.
+                child: QrImageView(data: code, size: 220),
+              ),
+            ),
+            const SizedBox(height: 16),
+            SelectableText(
+              code,
+              textAlign: TextAlign.center,
+              style: t.displaySmall?.copyWith(letterSpacing: 8, fontWeight: FontWeight.w700),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Al abrir un pedido pendiente (p. ej. al volver de Mercado Pago) le pide al servidor que verifique el pago,
+/// por si el aviso del webhook se atrasó. También ofrece reintentarlo a mano.
+class _VerifyPayment extends StatefulWidget {
+  const _VerifyPayment({required this.orderId});
+
+  final String orderId;
+
+  @override
+  State<_VerifyPayment> createState() => _VerifyPaymentState();
+}
+
+class _VerifyPaymentState extends State<_VerifyPayment> {
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _verify(silent: true);
+  }
+
+  Future<void> _verify({bool silent = false}) async {
+    setState(() => _busy = true);
+    try {
+      final paid = await Repository.instance.syncOrderPayment(widget.orderId);
+      // Si quedó pagado, el StreamBuilder del pedido cambia solo a la pantalla del QR.
+      if (!paid && !silent && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Aún no vemos tu pago. Si ya pagaste, espera unos segundos y vuelve a intentarlo.'),
+        ));
+      }
+    } catch (_) {
+      if (!silent && mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('No pudimos verificar el pago. Intenta de nuevo.')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton.icon(
+      onPressed: _busy ? null : () => _verify(),
+      icon: _busy
+          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+          : const Icon(Icons.refresh, size: 18),
+      label: Text(_busy ? 'Verificando pago…' : 'Ya pagué, verificar'),
+    );
   }
 }
 

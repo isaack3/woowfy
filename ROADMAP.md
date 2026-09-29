@@ -110,14 +110,43 @@ El QR contiene el mismo código de 6 caracteres que aparece debajo: el comercio 
 - [x] Mercado Pago Checkout Pro + webhook firmado + reembolsos (listo, falta cargar credenciales de prueba)
 - [x] Arreglo: al abrir directo una ruta protegida ya no manda al login si hay sesión
 
+### Sprint 4 — listo para el piloto (en curso)
+
+**Etapa A — Auditoría del 28-09 (dinero y reglas) ✅** · ver `AUDITORIA-2026-09-28.md` · probada en emuladores (16 pruebas)
+y desplegada el 28-09; datos de producción migrados
+- [x] A1 · #5 El comercio cancela la bolsa: cada pedido se cancela releyendo su estado (no se pierde ningún reembolso)
+- [x] A2 · #4 Precio válido también al editar una bolsa, y revisado otra vez en el servidor al comprar
+- [x] A3 · #3 Un local no puede crearse con calificación ni campos internos
+- [x] A4 · #2 El correo del dueño deja de estar en el local público (el admin lo ve desde su cuenta)
+- [x] A5 · #7 Misma verificación de monto en webhook y conciliación
+- [x] A6 · #9 Solo se compra si el local sigue aprobado
+- [x] A7 · #6 Máximo 2 reservas sin pagar por persona
+- [x] A8 · #8 Liquidación atómica (sin duplicados por doble clic)
+- [x] A9 · #1 Código de retiro privado: solo lo ve el cliente; el comercio lo valida cuando se lo muestran
+- [x] A10 · Menores: recordatorios acotados y comentarios al día (queda aceptado: subidas a Storage de cualquier
+      usuario con sesión y sin ventana de antigüedad en la firma del webhook; bajo impacto)
+- [x] A11 · Arrepentimiento: cancelar con reembolso hasta 15 min después de pagar (además de las 2 h antes del retiro)
+
+**Etapa B — Operación de pagos**
+- [x] Red de seguridad de pagos (el pedido se concilia con Mercado Pago si el aviso no llega)
+- [x] Comisión visible siempre (25%): admin → Ventas, ventas del local, al publicar una bolsa y en el detalle para clientes
+- [ ] Decidir: ¿se le paga al local si el cliente no llega a retirar? (recomendado: sí, como Too Good To Go)
+- [ ] "Liquidar todos" + planilla (CSV) con monto y datos bancarios de cada local para transferir en lote
+- [ ] Datos bancarios del local en su perfil (privados: solo el dueño y el admin)
+
+**Etapa C — Piloto**
+- [ ] Correos de confirmación de compra y de reembolso (salen cuando Resend esté activo)
+- [ ] Analítica básica (visitas, inscritos, reservas y pagos)
+- [ ] Landing en modo lanzamiento + correo a la lista de espera
+- [ ] Guía breve para comercios (publicar bolsas y validar retiros)
+
+**Etapa D — Pagos divididos con Mercado Pago Marketplace** (después de la SpA; ver sección "Pagos divididos")
+- [ ] Cada local conecta su cuenta de Mercado Pago; MP le deposita el 75% y a Woowfy el 25% en cada compra
+
 ### Próximo (por decidir)
-- [ ] Analítica (visitas y conversión de landing y app)
 - [ ] Empleados por local, reclamos y moderación de opiniones, invitar amigos (referidos)
-- [ ] Correo de confirmación de compra y de reembolso (cuando Resend esté activo)
 
 ### Pendiente (depende de ti)
-- [ ] 💳 **Compra de prueba con Mercado Pago:** MP ya está activo con cuenta de prueba y el webhook responde 200;
-      falta pagar con el comprador de prueba y ver que el pedido pase a "Pagado" con su QR
 - [ ] Confirmar en tu navegador que al recargar `app.woowfy.com/merchant` sigues con sesión
 - [ ] 🔔 **Clave VAPID** para notificaciones push: consola Firebase → Configuración del proyecto → Cloud Messaging
       → Certificados push web → Generar. La clave pública va en `lib/core/push.dart` y se redespliega la app.
@@ -148,7 +177,7 @@ El QR contiene el mismo código de 6 caracteres que aparece debajo: el comercio 
 - [ ] **Constituir la SpA** (ver sección "Empresa" abajo) ← bloquea el cobro real
 - [ ] Cuenta Mercado Pago **a nombre de la SpA**
 - [x] Implementar `MercadoPagoProvider` (Checkout Pro) + webhook `mercadoPagoWebhook` firmado + reembolsos (Sprint 3)
-- [~] Probar con **credenciales de prueba** de Mercado Pago: configurado, falta la compra de punta a punta
+- [x] Probar con **credenciales de prueba** de Mercado Pago: compra de punta a punta OK (28-09)
 - [ ] Definir cómo se paga a los comercios:
       - Opción A: **Split de Mercado Pago (Marketplace)** — cada comercio conecta su cuenta MP y
         recibe su parte directo; Woowfy cobra `marketplace_fee`. Más limpio contable y legalmente.
@@ -179,6 +208,28 @@ El QR contiene el mismo código de 6 caracteres que aparece debajo: el comercio 
 - [ ] Multi-moneda, impuestos y textos por país
 
 ---
+
+## Pagos divididos (Mercado Pago Marketplace) — plan, aún no implementado
+
+Hoy todo el dinero entra a la cuenta de Woowfy y se liquida a mano a cada local. Con **Marketplace**, cada compra se
+divide sola: Mercado Pago deposita el 75% en la cuenta del local y cobra el 25% (`marketplace_fee`) para Woowfy.
+
+1. **Requisitos:** SpA constituida, cuenta MP de la SpA y aplicación en modo Marketplace; cada local con cuenta MP.
+2. **Conectar al local (OAuth):** en su panel, botón "Conectar Mercado Pago" → autoriza a Woowfy en MP → vuelve
+   a una función `mpOAuthCallback` que cambia el código por un `access_token` + `refresh_token` **del local**.
+   Se guardan cifrados en un documento solo para el servidor (`stores/{id}/private/mercadopago`); el local ve
+   "Conectado como …". Un job renueva los tokens antes de que venzan (duran ~180 días).
+3. **Cobrar:** `createOrder` crea la preferencia **con el token del local** e incluye `marketplace_fee` = comisión.
+   El pago queda en la cuenta del local, y MP transfiere la comisión a Woowfy. El webhook y la conciliación
+   siguen igual (consultan el pago con el token del local).
+4. **Reembolsos:** se hacen con el token del local; MP devuelve también la comisión proporcional.
+5. **Transición:** locales sin cuenta conectada siguen con el flujo actual (cobro en Woowfy + liquidación manual),
+   así se puede migrar de a uno. "Liquidar" solo se usa para esos locales.
+6. **Ventajas:** no hay transferencias manuales, Woowfy no custodia dinero de terceros y cada uno tributa lo suyo
+   (Woowfy factura solo su comisión). **Costos:** la comisión de MP la paga el local sobre su venta (conviene
+   explicarlo en el contrato).
+7. **Esfuerzo estimado:** 1 sprint (OAuth + tokens + preferencia con token del local + panel "Conectar" + pruebas
+   con usuarios de prueba vendedor/comprador).
 
 ## Pagos: ¿mock, MP personal o SpA?
 

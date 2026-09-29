@@ -146,7 +146,6 @@ class _StoreRequestFormState extends State<_StoreRequestForm> {
     try {
       await Repository.instance.requestStore(
         uid: widget.uid,
-        email: FirebaseAuth.instance.currentUser?.email,
         name: _name.text.trim(),
         phone: _phone.text.trim(),
         region: _region!,

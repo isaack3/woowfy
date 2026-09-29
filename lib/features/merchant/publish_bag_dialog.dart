@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/format.dart';
 import '../../core/theme.dart';
 import '../../data/models.dart';
 import '../../data/repository.dart';
@@ -177,6 +178,22 @@ class _PublishBagDialogState extends State<PublishBagDialog> {
                       ),
                     ),
                   ],
+                ),
+                // Siempre a la vista: cuánto recibe el local y la comisión de Woowfy.
+                ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: _price,
+                  builder: (context, v, _) {
+                    final price = int.tryParse(v.text.trim());
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        price == null || price <= 0
+                            ? 'Woowfy cobra una comisión de $platformFeePercent sobre el precio de oferta.'
+                            : 'Recibes ${formatClp(storeShareOf(price))} por bolsa (comisión Woowfy $platformFeePercent).',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: WoowfyColors.muted),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 12),
                 TextFormField(

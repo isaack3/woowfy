@@ -163,8 +163,8 @@ class _SalesState extends State<_Sales> {
             else ...[
               Row(children: [kpi('Bolsas vendidas', '${sold.length}'), kpi('Ventas', formatClp(gross))]),
               Row(children: [
-                kpi('Comisión Woowfy', formatClp(fee)),
-                kpi('Para ti', formatClp(gross - fee), strong: true),
+                kpi('Comisión Woowfy ($platformFeePercent)', formatClp(fee)),
+                kpi('Para ti ($storeSharePercent)', formatClp(gross - fee), strong: true),
               ]),
               if (cancelled > 0)
                 Padding(

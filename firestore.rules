@@ -5,6 +5,7 @@ rules_version = '2';
 //   stores/{storeId}   comercio; status: pending | approved | rejected | suspended (lo cambia un admin)
 //   bags/{bagId}       bolsa sorpresa publicada por un comercio
 //   orders/{orderId}   compra; solo la crean/actualizan Cloud Functions (pago)
+//   orders/{orderId}/private/pickup   código de retiro (solo el cliente)
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -42,9 +43,12 @@ service cloud.firestore {
         || (signedIn() && resource.data.ownerUid == request.auth.uid)
         || isAdmin();
       // Solicitud de alta: queda pendiente hasta que un admin la revise.
+      // Solo los campos de la solicitud: la nota, la ubicación y la revisión las pone el servidor o el admin.
       allow create: if signedIn()
         && request.resource.data.ownerUid == request.auth.uid
-        && request.resource.data.status == 'pending';
+        && request.resource.data.status == 'pending'
+        && request.resource.data.keys().hasOnly(['ownerUid', 'name', 'category', 'region', 'comuna',
+             'address', 'phone', 'status', 'createdAt']);
       // El dueño edita sus datos pero no su estado (salvo reenviar una solicitud rechazada);
       // el admin aprueba, rechaza o suspende.
       allow update: if isAdmin() || (signedIn()
@@ -66,6 +70,8 @@ service cloud.firestore {
       // El admin puede pausar bolsas (p. ej. al suspender un comercio).
       allow update: if isAdmin() || (ownsApprovedStore(resource.data.storeId)
         && request.resource.data.storeId == resource.data.storeId
+        && request.resource.data.price > 0
+        && request.resource.data.price < request.resource.data.originalPrice
         && !touchesRating(resource.data, request.resource.data));
       allow delete: if ownsApprovedStore(resource.data.storeId) || isAdmin();
     }
@@ -111,6 +117,13 @@ service cloud.firestore {
       allow read: if signedIn() && (resource.data.userUid == request.auth.uid
         || ownsApprovedStore(resource.data.storeId) || isAdmin());
       allow write: if false; // Solo Cloud Functions (Admin SDK) tras confirmar el pago.
+
+      // Código de retiro: solo lo ve el cliente (el comercio lo valida cuando se lo muestran).
+      match /private/{doc} {
+        allow read: if signedIn() && resource.data.userUid == request.auth.uid;
+        allow write: if false;
+      }
     }
+    // pickupCodes/{storeId_código}: índice de códigos vigentes, solo para el servidor (sin reglas = sin acceso).
   }
 }

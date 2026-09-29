@@ -36,7 +36,6 @@ await user("admin@woowfy.test", "admin");
 const cafeUid = await user("cafe@woowfy.test", "customer");
 await db.doc("stores/demo-cafe").set({
   ownerUid: cafeUid,
-  ownerEmail: "cafe@woowfy.test",
   name: "Café del Barrio",
   category: "Café",
   comuna: "Ñuñoa",
@@ -56,7 +55,6 @@ const store = {
   comuna: "Providencia",
   region: "Metropolitana de Santiago",
   address: "Av. Providencia 1234",
-  ownerEmail: "comercio@woowfy.test",
   phone: "+56 9 3333 4444",
   status: "approved",
   createdAt: FieldValue.serverTimestamp(),

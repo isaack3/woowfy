@@ -60,6 +60,8 @@ export const sendPickupReminders = onSchedule({
   const orders = await db.collection("orders")
     .where("status", "==", "paid")
     .where("pickupStart", "<=", Timestamp.fromMillis(now + 45 * 60_000))
+    // Sin límite inferior, cada corrida revisaría todos los pedidos pagados que nunca se retiraron.
+    .where("pickupStart", ">=", Timestamp.fromMillis(now - 3 * 3600_000))
     .get();
   let sent = 0;
   for (const d of orders.docs) {

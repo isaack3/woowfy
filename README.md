@@ -83,6 +83,8 @@ El primer admin se asignó a mano; los siguientes se dan desde **Admin → Usuar
 | `bags/{id}` | bolsa del día: precio, stock, horario, foto, categoría, logo y coordenadas del local | comercio aprobado (o la función de recurrentes); admin puede pausar |
 | `bagTemplates/{id}` | bolsa recurrente: días de la semana, horario `HH:mm`, precio, cantidad | comercio aprobado |
 | `orders/{id}` | compra: estado, monto, precio original, comisión, código de retiro, cancelación y reembolso, calificación, liquidación | **solo Cloud Functions** |
+| `orders/{id}/private/pickup` | código de retiro del pedido | **solo Cloud Functions**; lo lee solo el cliente |
+| `pickupCodes/{storeId}_{código}` | índice de códigos vigentes para validar retiros | **solo Cloud Functions**; sin acceso desde la app |
 | `reviews/{orderId}` | calificación (1–5) y comentario de un pedido retirado | **solo la función** `rateOrder`; lectura pública |
 | `payouts/{id}` | pago de Woowfy a un comercio: pedidos, ventas, comisión, monto y nota | **solo la función** `createPayout`; lo ve el admin y el comercio |
 | `waitlist/{hash}` | inscritos de la landing: nombre, correo, tipo, región, comuna, estado del correo | **solo funciones**; lee el admin |

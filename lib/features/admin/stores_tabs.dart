@@ -148,7 +148,14 @@ class _StoreCard extends StatelessWidget {
             Wrap(
               spacing: 16,
               children: [
-                if (store.ownerEmail != null) _Contact(icon: Icons.mail_outline, text: store.ownerEmail!, style: muted),
+                // El correo ya no se guarda en el local (que es público): se lee de la cuenta del dueño.
+                FutureBuilder<String?>(
+                  future: Repository.instance.userEmail(store.ownerUid),
+                  builder: (context, snap) {
+                    final email = snap.data ?? store.ownerEmail;
+                    return email == null ? const SizedBox.shrink() : _Contact(icon: Icons.mail_outline, text: email, style: muted);
+                  },
+                ),
                 if (store.phone != null) _Contact(icon: Icons.phone_outlined, text: store.phone!, style: muted),
               ],
             ),
