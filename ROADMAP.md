@@ -12,8 +12,8 @@ firmado + red de seguridad). Clientes: lista, mapa, favoritos, reserva, QR, canc
 de pagar), calificar, impacto. Comercios: perfil, bolsas y recurrentes, cancelar bolsa, escáner QR propio (también
 en iPhone), ventas, "Por recibir", cuenta bancaria y guía (`woowfy.com/merchants`). Admin: solicitudes, comercios,
 liquidar / liquidar todos (planilla CSV), ventas, analítica anónima, interesados + modo lanzamiento de la landing,
-usuarios y correo (plantillas de bienvenida, compra y reembolso). Auditoría del 28-09 corregida. Sprints 1–4
-desplegados; la landing sigue "en construcción".
+usuarios y correo (plantillas de bienvenida, compra y reembolso). Auditoría del 28-09 corregida. Inicio de sesión con Google desde
+`app.woowfy.com` ("Ir a woowfy.com"). Sprints 1–4 desplegados; la landing sigue "en construcción".
 
 **Para retomar, primero lo que depende de ti** (sección "Pendiente" más abajo): probar el escáner en iPhone,
 activar Resend (los correos ya están listos), constituir la SpA y pasar Mercado Pago a producción. Con eso se
@@ -155,9 +155,7 @@ y desplegada el 28-09; datos de producción migrados
 - [ ] Empleados por local, reclamos y moderación de opiniones, invitar amigos (referidos)
 
 ### Pendiente (depende de ti)
-- [ ] 🔐 **Google muestre "Woowfy" al iniciar sesión:** (1) agregar `https://app.woowfy.com/__/auth/handler` como URI de
-      redirección del cliente OAuth web y avisar para cambiar `authDomain` a `app.woowfy.com`; (2) verificar la marca
-      en Google Auth Platform → Branding (nombre, logo, woowfy.com, /privacy, /terms)
+- [ ] 🔐 Verificación de marca en Google Auth Platform (opcional ahora: el inicio de sesión ya dice "Ir a woowfy.com")
 - [ ] 📷 Probar el escáner QR nuevo en iPhone (Safari) con una compra de prueba
 - [ ] 💸 Probar la liquidación: cuenta bancaria en *Ventas y pagos* y Admin → Comercios → "Liquidar todos"
 - [ ] ✏️ Confirmar en la guía para comercios "pago semanal" y "aprobación en 1 día hábil" (y en los términos)
@@ -183,6 +181,7 @@ y desplegada el 28-09; datos de producción migrados
 - [x] Usuario admin en producción y tu local "Woowfy App" aprobado
 - [x] Fotos visibles en la app (CORS del bucket de Storage)
 - [x] Imagen para compartir en redes (`og:image`) en la landing
+- [x] Inicio de sesión con Google desde `app.woowfy.com` (Google muestra "Ir a woowfy.com")
 - [x] Mercado Pago de prueba configurado (app Woowfy, token, clave del webhook regenerada, simulación 200)
 - [x] Escáner QR en computador: usa la webcam, botón para cambiar de cámara y ayuda si no hay imagen
 - [x] Admin: explicación breve en cada pestaña y contenido centrado

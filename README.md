@@ -203,6 +203,15 @@ DNS administrado en **Piensa Solutions**.
 Un nombre con CNAME no puede tener otros registros, y el dominio raíz (`@`) no admite CNAME.
 El TXT `google-site-verification` es de Google Search Console: no borrarlo.
 
+**Inicio de sesión con Google:** el `authDomain` de la app es `app.woowfy.com` (en `lib/firebase_options.dart` y
+`web/firebase-messaging-sw.js`), así Google muestra "Ir a woowfy.com" y el inicio de sesión ocurre en el mismo sitio
+(mejor en Safari). Firebase Hosting sirve `/__/auth/handler` en ese dominio. Requisitos, ya configurados:
+`https://app.woowfy.com/__/auth/handler` en las URIs de redirección del cliente OAuth web (Google Cloud →
+Credenciales → "Web client (auto created by Google Service)") y `app.woowfy.com` en los dominios autorizados de
+Firebase Auth. Si se cambia el dominio, primero se agrega la URI nueva en ese cliente; si no, el ingreso con Google
+da `redirect_uri_mismatch`. La marca (nombre, logo `brand/fixed/logo-google-120.png`, enlaces legales) está en
+Google Auth Platform → Información de la marca.
+
 ## Funcionalidades clave
 
 - **Lista de espera (landing):** el formulario "Avísame cuando lancen" envía a `/api/waitlist`, sin cargar
@@ -221,8 +230,9 @@ El TXT `google-site-verification` es de Google Search Console: no borrarlo.
 - **Código de retiro privado:** vive en `orders/{id}/private/pickup` (solo el cliente) y en
   `pickupCodes/{local}_{código}` (solo el servidor). El comercio lo valida cuando el cliente se lo muestra.
 - **Pagos al local:** "Por recibir" suma pedidos retirados y no retirados (`no_show`, los marca `markNoShows`
-  1 h después del retiro). El admin liquida por local o con **Liquidar todos**, que entrega una planilla CSV con
-  titular, RUT, banco, cuenta y monto de cada local.
+  1 h después del retiro). El local registra su cuenta bancaria en *Ventas y pagos* con un flujo visual de 3 pasos
+  (Agrega tu cuenta → Vende y entrega → Te transferimos), igual que en la guía. El admin liquida por local o con
+  **Liquidar todos**, que entrega una planilla CSV con titular, RUT, banco, cuenta y monto de cada local.
 - **Red de seguridad de pagos:** si el aviso de Mercado Pago no llega, `syncOrderPayment` (al volver del pago o
   con "Ya pagué, verificar") y `expirePendingOrders` consultan el pago a Mercado Pago antes de vencer la reserva.
 - **Analítica anónima:** `/api/track` suma contadores por día en `stats/` (sin cookies ni datos personales).
