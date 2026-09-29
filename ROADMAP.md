@@ -1,21 +1,23 @@
 # Woowfy — Hoja de ruta
 
 Marketplace de bolsas sorpresa contra el desperdicio de comida. Chile primero, luego Latam.
-Marca las casillas a medida que avancemos. Última actualización: 28-09-2026 (Sprint 3).
+Marca las casillas a medida que avancemos. Última actualización: 29-09-2026 (Sprint 4).
 
 **En línea:** [woowfy.com](https://woowfy.com) (landing) · [app.woowfy.com](https://app.woowfy.com) (app)
 
-## 📍 Dónde quedamos (28-09-2026)
+## 📍 Dónde quedamos (29-09-2026)
 
-MVP técnico completo con pago **simulado** y Mercado Pago **listo para probar** con credenciales de prueba:
-clientes (lista, mapa, favoritos, reserva, QR, cancelar con reembolso, calificar, impacto), comercios (perfil,
-bolsas y recurrentes, cancelar bolsa, validar retiro con cámara, ventas y pagos) y admin (solicitudes,
-comercios y liquidaciones, ventas, interesados, usuarios, correo). Sprints 1, 2 y 3 terminados y desplegados.
-La landing está "en construcción" con lista de espera.
+**Lo técnico del piloto está completo.** Mercado Pago funciona de punta a punta con una cuenta de prueba (webhook
+firmado + red de seguridad). Clientes: lista, mapa, favoritos, reserva, QR, cancelar (2 h antes o 15 min después
+de pagar), calificar, impacto. Comercios: perfil, bolsas y recurrentes, cancelar bolsa, escáner QR propio (también
+en iPhone), ventas, "Por recibir", cuenta bancaria y guía (`woowfy.com/merchants`). Admin: solicitudes, comercios,
+liquidar / liquidar todos (planilla CSV), ventas, analítica anónima, interesados + modo lanzamiento de la landing,
+usuarios y correo (plantillas de bienvenida, compra y reembolso). Auditoría del 28-09 corregida. Sprints 1–4
+desplegados; la landing sigue "en construcción".
 
-**Para retomar, primero lo que depende de ti** (sección "Pendiente" más abajo): credenciales de prueba de
-Mercado Pago, clave VAPID, Resend e ImprovMX. Después: probar pagos de punta a punta con usuarios de prueba,
-constituir la SpA y pasar a credenciales de producción.
+**Para retomar, primero lo que depende de ti** (sección "Pendiente" más abajo): probar el escáner en iPhone,
+activar Resend (los correos ya están listos), constituir la SpA y pasar Mercado Pago a producción. Con eso se
+puede lanzar (interruptor en Admin → Interesados).
 
 ---
 
@@ -135,9 +137,9 @@ y desplegada el 28-09; datos de producción migrados
 - [x] "Liquidar todos" (Admin → Comercios) + planilla CSV con titular, RUT, banco, cuenta y monto por local
 - [x] Datos bancarios del local en "Ventas y pagos" (privados: solo el dueño y el admin)
 
-**Etapa C — Piloto**
+**Etapa C — Piloto ✅** (salvo el correo de lanzamiento, que espera a Resend)
 - [x] Correos de compra (con código de retiro) y de reembolso (con motivo): función `onOrderUpdated`, interruptor
-      en Admin → Correo y pruebas de cada tipo. Salen solos cuando actives Resend (vista previa: `node tool/preview-emails.mjs`)
+      en Admin → Correo, **vista previa de plantillas sin enviar** y pruebas de cada tipo. Salen solos cuando actives Resend (vista previa: `node tool/preview-emails.mjs`)
 - [x] Analítica básica propia y anónima (sin cookies): contadores por día en `stats/` + pestaña Admin → Analítica
       con visitas, inscritos, cuentas nuevas y embudo visita → bolsa vista → reserva → pago → retiro
 - [x] Landing con modo lanzamiento: interruptor en Admin → Interesados (`config/site`), sin redesplegar
@@ -152,6 +154,9 @@ y desplegada el 28-09; datos de producción migrados
 - [ ] Empleados por local, reclamos y moderación de opiniones, invitar amigos (referidos)
 
 ### Pendiente (depende de ti)
+- [ ] 📷 Probar el escáner QR nuevo en iPhone (Safari) con una compra de prueba
+- [ ] 💸 Probar la liquidación: cuenta bancaria en *Ventas y pagos* y Admin → Comercios → "Liquidar todos"
+- [ ] ✏️ Confirmar en la guía para comercios "pago semanal" y "aprobación en 1 día hábil" (y en los términos)
 - [ ] Confirmar en tu navegador que al recargar `app.woowfy.com/merchant` sigues con sesión
 - [ ] 🔔 **Clave VAPID** para notificaciones push: consola Firebase → Configuración del proyecto → Cloud Messaging
       → Certificados push web → Generar. La clave pública va en `lib/core/push.dart` y se redespliega la app.
@@ -160,7 +165,8 @@ y desplegada el 28-09; datos de producción migrados
       Admin → Correo (hoy el secreto tiene un valor provisional)
 - [ ] 📥 Reenvío `hola@woowfy.com` → Gmail con ImprovMX (MX `mx1/mx2.improvmx.com`, TXT SPF) y TXT `_dmarc`
 - [ ] 🗺️ Revisar el mapa en la app y poner la dirección real de tu local (hoy ubicado en el centro de El Monte)
-- [ ] ⚖️ Revisión legal de `/terms` y `/privacy` y completar datos de la SpA (razón social, RUT, domicilio)
+- [ ] ⚖️ Revisión legal de `/terms` y `/privacy` (actualizados el 29-09 con todo lo nuevo) y completar datos de la
+      SpA y los valores en amarillo (2 reservas, 25%, pago semanal)
 - [ ] 💰 **Alerta de presupuesto** en Google Cloud Billing (ej. USD 10)
 - [ ] ↪️ Redirección 301 `www.woowfy.com` → `woowfy.com` (consola → Hosting → sitio woowfy-app → editar dominio)
 - [ ] Personalizar la plantilla del correo "recuperar contraseña" (Authentication → Plantillas)
@@ -176,7 +182,8 @@ y desplegada el 28-09; datos de producción migrados
 - [x] Mercado Pago de prueba configurado (app Woowfy, token, clave del webhook regenerada, simulación 200)
 - [x] Escáner QR en computador: usa la webcam, botón para cambiar de cámara y ayuda si no hay imagen
 - [x] Admin: explicación breve en cada pestaña y contenido centrado
-- [x] Escáner QR en iPhone: el video de la cámara necesita `playsinline` (arreglo en `web/index.html`) + botón Reintentar
+- [x] Escáner QR web propio (`web/qr_scanner.js`): capa HTML con cámara `playsinline` + BarcodeDetector/jsQR,
+      mensajes por tipo de error y "Escribir el código". Probado leyendo un QR simulado; falta confirmarlo en iPhone
 
 ## Fase 2 — Pagos reales y operación
 

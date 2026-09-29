@@ -12,7 +12,7 @@ export { rateOrder } from "./reviews.js";
 export { createAllPayouts, createPayout } from "./payouts.js";
 export { trackEvent } from "./analytics.js";
 export { joinWaitlist } from "./waitlist.js";
-export { onOrderUpdated, onWaitlistCreated, sendTestEmail } from "./email.js";
+export { onOrderUpdated, onWaitlistCreated, previewEmail, sendTestEmail } from "./email.js";
 export { onBagTemplateWritten, publishRecurringBags } from "./recurring.js";
 export { onStoreCreated, onStoreUpdated } from "./stores.js";
 export { onBagCreated, sendPickupReminders } from "./notifications.js";

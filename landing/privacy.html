@@ -16,7 +16,7 @@
   <header><a href="/"><img src="/icons/icon-192.png" alt="">woowfy</a></header>
   <main>
     <h1>Política de privacidad</h1>
-    <p class="updated">Última actualización: 28 de septiembre de 2026</p>
+    <p class="updated">Última actualización: 29 de septiembre de 2026</p>
     <p class="draft"><strong>Borrador.</strong> Pendiente de revisión legal y de completar los datos marcados en
       <span class="fill">amarillo</span>. Redactada conforme a la Ley N° 19.628 y a la Ley N° 21.719 sobre protección
       de datos personales.</p>
@@ -31,25 +31,36 @@
       <tr><th>Cuándo</th><th>Datos</th></tr>
       <tr><td>Lista de espera (woowfy.com)</td><td>Nombre, correo, región, comuna, si eres cliente o comercio y el nombre del local.</td></tr>
       <tr><td>Cuenta en la app</td><td>Nombre, correo y, si ingresas con Google, los datos básicos de tu perfil de Google (nombre y correo).</td></tr>
-      <tr><td>Compras</td><td>Bolsas compradas, montos, fechas, estado del pedido y código de retiro. Los datos de tu tarjeta los trata el proveedor de pagos, no Woowfy.</td></tr>
-      <tr><td>Comercios</td><td>Datos del local (nombre, dirección, categoría, logo, horario), teléfono y correo de contacto, ventas y liquidaciones.</td></tr>
+      <tr><td>Compras</td><td>Bolsas compradas, montos, fechas, estado del pedido, reembolsos y código de retiro. Los datos de tu tarjeta los trata el proveedor de pagos, no Woowfy.</td></tr>
+      <tr><td>Calificaciones</td><td>La nota (1 a 5), tu comentario y tu nombre de pila.</td></tr>
+      <tr><td>Favoritos y avisos</td><td>Los locales que sigues y, si activas las notificaciones, un identificador técnico de tu navegador o dispositivo para enviarte avisos.</td></tr>
+      <tr><td>Ubicación</td><td>Si usas "Cerca de mí", tu ubicación se usa solo en tu dispositivo para ordenar las bolsas por distancia; no la guardamos.</td></tr>
+      <tr><td>Comercios</td><td>Datos del local (nombre, dirección, categoría, logo, horario, teléfono), correo del dueño, ventas, liquidaciones y la cuenta bancaria donde recibe sus pagos (titular, RUT, banco y número de cuenta).</td></tr>
       <tr><td>Uso técnico</td><td>Registros técnicos necesarios para la seguridad y el funcionamiento (por ejemplo, fecha y hora de acceso).</td></tr>
     </table>
 
     <h2>3. Para qué los usamos</h2>
     <ul>
-      <li>Crear y administrar tu cuenta y tus pedidos, y permitir el retiro en el local (ejecución del contrato).</li>
+      <li>Crear y administrar tu cuenta y tus pedidos, permitir el retiro en el local y enviarte los correos del pedido
+        (confirmación de compra con tu código de retiro y avisos de reembolso) (ejecución del contrato).</li>
+      <li>Enviarte notificaciones de los locales que sigues y recordatorios de retiro, si las activas (consentimiento).</li>
       <li>Avisarte del lanzamiento y, si lo aceptaste, enviarte novedades de Woowfy (consentimiento, que puedes retirar cuando quieras).</li>
-      <li>Validar y gestionar a los comercios, y pagarles sus ventas.</li>
+      <li>Validar y gestionar a los comercios, y pagarles sus ventas por transferencia.</li>
+      <li>Medir el uso del servicio con estadísticas anónimas (ver punto 9).</li>
       <li>Prevenir fraudes, proteger la plataforma y cumplir obligaciones legales y tributarias.</li>
     </ul>
 
     <h2>4. Con quién los compartimos</h2>
     <ul>
-      <li><strong>El comercio</strong> donde compras recibe solo lo necesario para entregarte el pedido.</li>
+      <li><strong>El comercio</strong> donde compras ve el pedido (bolsa, monto y estado) para entregártelo. No le
+        entregamos tu correo ni tu teléfono, y tu código de retiro solo lo ve cuando se lo muestras. Tu calificación y
+        comentario son públicos, con tu nombre de pila.</li>
       <li><strong>Proveedores que trabajan por encargo nuestro:</strong> Google Cloud / Firebase (alojamiento, base de
-        datos y autenticación; servidores principalmente en Santiago de Chile), Resend (envío de correos) y el proveedor de
-        pagos (por ejemplo, Mercado Pago).</li>
+        datos, autenticación y notificaciones; servidores principalmente en Santiago de Chile), Resend (envío de
+        correos) y el proveedor de pagos, Mercado Pago, al que le indicamos tu correo para el pago.</li>
+      <li><strong>Recursos técnicos de terceros:</strong> el mapa se carga desde OpenStreetMap, las tipografías desde
+        Google Fonts y algunas bibliotecas (como el lector de QR) desde jsDelivr. Estos servicios reciben la dirección IP
+        de tu navegador al descargarlos, como ocurre al visitar cualquier sitio.</li>
       <li>Autoridades, cuando la ley lo exija.</li>
     </ul>
     <p>Algunos de estos proveedores pueden tratar datos fuera de Chile. En esos casos exigimos garantías adecuadas de
@@ -67,7 +78,9 @@
 
     <h2>7. Seguridad</h2>
     <p>Aplicamos medidas técnicas y organizativas razonables: conexiones cifradas (HTTPS), control de acceso por
-      roles, reglas de seguridad en la base de datos y claves guardadas en gestores de secretos.</p>
+      roles, reglas de seguridad en la base de datos y claves guardadas en gestores de secretos. Los datos bancarios de
+      los comercios y los códigos de retiro se guardan en documentos privados, accesibles solo por su dueño y por el
+      equipo de Woowfy cuando corresponde.</p>
 
     <h2>8. Menores de edad</h2>
     <p>Woowfy no está dirigido a menores de 14 años y no recolectamos sus datos a sabiendas.</p>
@@ -78,7 +91,8 @@
     <p><strong>Estadísticas de uso anónimas:</strong> para saber cuántas personas visitan woowfy.com y la app, sumamos
       contadores por día (por ejemplo, "visitas a la página" o "bolsas vistas"). No guardamos tu IP, identificadores,
       cookies ni ningún dato que permita reconocerte: solo el total del día. Para no contar dos veces la misma visita,
-      el navegador guarda una marca temporal que se borra al cerrar la pestaña.</p>
+      el navegador guarda una marca temporal que se borra al cerrar la pestaña. La landing también recuerda en tu
+      navegador si Woowfy ya lanzó, para mostrar la versión correcta sin parpadeos.</p>
 
     <h2>10. Cambios</h2>
     <p>Si actualizamos esta política de forma relevante, te lo avisaremos por la app o por correo.</p>

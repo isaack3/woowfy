@@ -1,6 +1,7 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/web_qr.dart';
 import '../../data/repository.dart';
 import 'qr_scanner_page.dart';
 
@@ -25,9 +26,12 @@ class _RedeemDialogState extends State<RedeemDialog> {
   }
 
   Future<void> _scan() async {
-    final code = await Navigator.of(context).push<String>(
-      MaterialPageRoute(fullscreenDialog: true, builder: (_) => const QrScannerPage()),
-    );
+    // En la web usamos el escáner HTML propio (web/qr_scanner.js); mobile_scanner queda para la app nativa.
+    final code = WebQr.available
+        ? await WebQr.scan()
+        : await Navigator.of(context).push<String>(
+            MaterialPageRoute(fullscreenDialog: true, builder: (_) => const QrScannerPage()),
+          );
     if (code == null || !mounted) return;
     _code.text = code;
     await _redeem();

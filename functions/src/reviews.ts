@@ -33,8 +33,7 @@ export const rateOrder = onCall(async (req) => {
     tx.create(reviewRef, {
       orderId,
       storeId: order.storeId,
-      userUid: uid,
-      // Solo el nombre de pila: la reseña es visible para el comercio.
+      // Las opiniones son públicas: solo el nombre de pila, sin identificadores de la cuenta.
       userName: String(user.name ?? "").trim().split(/\s+/)[0] || "Cliente",
       bagTitle: order.bagTitle,
       rating,

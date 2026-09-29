@@ -16,7 +16,7 @@ Chile primero, luego Latam.
 | Landing | HTML + CSS estático (`landing/`), pensado para SEO, con lista de espera y páginas legales |
 | Backend | Firebase: Auth (correo + Google), Firestore, Storage (fotos), Cloud Functions (TypeScript, Node 22), Cloud Messaging (push), Hosting |
 | Pagos | Proveedor intercambiable: `mock` hoy, Mercado Pago después |
-| Correos | Resend (pendiente de activar) |
+| Correos | Resend (plantillas listas; falta activar la cuenta) |
 | Builds móviles | Codemagic (`codemagic.yaml`), para compilar iOS sin Mac |
 
 Proyecto Firebase: **`woowfy-app`** (plan Blaze). Paquete Android / Bundle iOS: `com.woowfy.woowfy`.
@@ -27,7 +27,8 @@ Proyecto Firebase: **`woowfy-app`** (plan Blaze). Paquete Android / Bundle iOS: 
 lib/
   main.dart, app.dart
   core/          tema y logo, router, formato CLP, backend (emuladores/región), checkout,
-                 ubicación, push (FCM), instalación PWA, enlaces legales
+                 ubicación, push (FCM), instalación PWA, enlaces legales, analítica anónima,
+                 puente al escáner QR web (web_qr)
   data/          modelos, repositorio Firestore/Functions/Storage, regiones de Chile
   features/
     shell/       navegación principal (Bolsas / Mis pedidos / Cuenta) y encabezado verde
@@ -37,29 +38,35 @@ lib/
     orders/      checkout simulado, comprobante con QR, "Mis pedidos"
     account/     cuenta: nombre, tu impacto, notificaciones, instalar app, legales
     merchant/    panel del comercio: perfil, bolsas (y recurrentes), cancelar bolsa, validar retiro con QR,
-                 ventas y pagos
-    admin/       solicitudes, comercios, ventas, interesados, usuarios, correo
+                 ventas y pagos, cuenta bancaria, enlace a la guía para comercios
+    admin/       solicitudes, comercios (liquidar / liquidar todos), ventas, analítica, interesados (y modo
+                 lanzamiento de la landing), usuarios, correo (plantillas y pruebas)
 assets/brand/    isotipo usado en la app
 functions/src/
-  orders.ts          createOrder, confirmMockPayment, redeemOrder, expirePendingOrders,
-                     cancelOrder (cliente), cancelBag (comercio), mercadoPagoWebhook
+  orders.ts          createOrder, confirmMockPayment, redeemOrder, expirePendingOrders, markNoShows,
+                     cancelOrder (cliente), cancelBag (comercio), mercadoPagoWebhook, syncOrderPayment
   payments.ts        PaymentProvider: mock | mercadopago (Checkout Pro, reembolsos, firma del webhook)
   reviews.ts         rateOrder: calificación de pedidos retirados y nota del local
-  payouts.ts         createPayout: liquidación de ventas al comercio (admin)
+  payouts.ts         createPayout / createAllPayouts: liquidación de ventas a un local o a todos (admin)
   waitlist.ts        joinWaitlist (formulario "Avísame" de la landing)
-  email.ts           onWaitlistCreated (bienvenida vía Resend) y sendTestEmail
+  email.ts           correos vía Resend: onWaitlistCreated (bienvenida), onOrderUpdated (compra y reembolso),
+                     previewEmail y sendTestEmail (vista previa y prueba desde el admin)
+  analytics.ts       trackEvent: contadores anónimos de visitas por día (/api/track)
   recurring.ts       bolsas recurrentes: onBagTemplateWritten + publishRecurringBags (05:00 Chile)
   stores.ts          onStoreCreated/onStoreUpdated: coordenadas y copia del perfil a sus bolsas
   geo.ts             geocodificación de direcciones (Nominatim / OpenStreetMap)
   notifications.ts   push: aviso a seguidores (onBagCreated) y recordatorio de retiro (cada 15 min)
   chile.ts           regiones de Chile (validación)
 functions/scripts/seed-emulators.mjs   datos y cuentas de prueba para los emuladores
-landing/         woowfy.com: index.html, terms.html, privacy.html, íconos, og-image, manifest
+landing/         woowfy.com: index.html, merchants.html (guía para comercios), terms.html, privacy.html,
+                 site.js (modo lanzamiento + analítica), íconos, og-image, manifest
+web/             index.html, qr_scanner.js (escáner QR web), firebase-messaging-sw.js, manifest, íconos
 brand/           brand kit v2 original + brand/fixed/ (íconos corregidos)
 tool/
   stamp-web-build.mjs        agrega ?v=<hash> a main.dart.js en cada deploy (evita caché vieja)
   set-storage-cors.mjs       aplica storage-cors.json al bucket (necesario para ver fotos en la app)
   backfill-store-coords.mjs  calcula coordenadas de locales que no las tienen
+  preview-emails.mjs         genera los correos de ejemplo en build/emails/*.html (no envía nada)
 firestore.rules, firestore.indexes.json, storage.rules, storage-cors.json
 ```
 
@@ -68,8 +75,8 @@ firestore.rules, firestore.indexes.json, storage.rules, storage-cors.json
 | Perfil | Cómo se obtiene | Qué hace |
 |---|---|---|
 | Cliente | Registrándose | Ve bolsas (lista o mapa), sigue locales, reserva y paga, retira con QR |
-| Comercio | Un usuario pide sumar su local y un admin lo aprueba | Perfil del local, publica bolsas (o recurrentes), valida retiros |
-| Admin | `role: admin` en `users/{uid}` | Aprueba comercios, ve ventas e inscritos, gestiona usuarios y correo |
+| Comercio | Un usuario pide sumar su local y un admin lo aprueba | Perfil del local, publica bolsas (o recurrentes), valida retiros, ve ventas y registra su cuenta bancaria |
+| Admin | `role: admin` en `users/{uid}` | Aprueba comercios, liquida ventas, ve ventas, analítica e inscritos, lanza la landing, gestiona usuarios y correo |
 
 El primer admin se asignó a mano; los siguientes se dan desde **Admin → Usuarios**.
 
@@ -91,11 +98,12 @@ El primer admin se asignó a mano; los siguientes se dan desde **Admin → Usuar
 | `reviews/{orderId}` | calificación (1–5) y comentario de un pedido retirado | **solo la función** `rateOrder`; lectura pública |
 | `payouts/{id}` | pago de Woowfy a un comercio: pedidos, ventas, comisión, monto y nota | **solo la función** `createPayout`; lo ve el admin y el comercio |
 | `waitlist/{hash}` | inscritos de la landing: nombre, correo, tipo, región, comuna, estado del correo | **solo funciones**; lee el admin |
-| `config/email` | remitente de los correos | solo admin (Admin → Correo) |
+| `config/email` | interruptor general, correos de pedidos (`orderEmails`) y remitente | solo admin (Admin → Correo) |
 
 Estados de un pedido: `pending_payment` (bolsa reservada 15 min) → `paid` (muestra QR) →
 `picked_up` (el comercio validó el código) o `no_show` (no se retiró a tiempo: sin reembolso y se le paga igual al local). `cancelled` si no se paga a tiempo, se rechaza el pago, el cliente
-cancela (hasta 2 h antes del retiro, con reembolso) o el comercio cancela la bolsa (reembolso y aviso).
+cancela (hasta 2 h antes del retiro o 15 min después de pagar, con reembolso) o el comercio cancela la bolsa
+(reembolso y aviso). Cada pedido guarda el estado de sus correos en `emails.purchase` / `emails.refund`.
 La nota de un local solo la escribe el servidor: las reglas impiden que el comercio la modifique.
 
 ## Rutas de la app
@@ -115,7 +123,8 @@ Las rutas van en inglés; los textos de la interfaz, en español de Chile.
 | `/merchant/sales` | Ventas y pagos del comercio |
 | `/admin` | Panel admin |
 
-Landing: `/`, `/terms`, `/privacy`, y `/api/waitlist` (rewrite hacia la función `joinWaitlist`).
+Landing: `/`, `/merchants` (guía para comercios), `/terms`, `/privacy`, `/api/waitlist` (rewrite hacia
+`joinWaitlist`) y `/api/track` (analítica, también en la app).
 
 ## Desarrollo local (emuladores)
 
@@ -141,6 +150,8 @@ flutter run -d chrome --dart-define=USE_EMULATORS=true
   bolsa de ejemplo sin foto. Las reglas de Storage se prueban con la Rules API (`projects.test`).
 - Para las funciones con secretos, crea `functions/.secret.local` (ignorado por git) con valores de prueba:
   `RESEND_API_KEY=...`, `MP_ACCESS_TOKEN=TEST-...`, `MP_WEBHOOK_SECRET=...`.
+- Producción usa Mercado Pago; para el emulador crea `functions/.env.local` (ignorado por git) con
+  `PAYMENTS_PROVIDER=mock`, así el checkout es simulado.
 - Si al iniciar dice que los puertos 4000/8080/9099 están ocupados, quedó un emulador anterior abierto.
 
 Calidad:
@@ -176,7 +187,7 @@ npm --prefix functions run build
   no los detecta `flutter analyze`, solo `flutter build web`.
 
 Regiones: Firestore, Storage y las funciones en **Santiago** (`southamerica-west1`). Las tareas programadas
-(`expirePendingOrders`, `publishRecurringBags`, `sendPickupReminders`) en **São Paulo**
+(`expirePendingOrders`, `markNoShows`, `publishRecurringBags`, `sendPickupReminders`) en **São Paulo**
 (`southamerica-east1`), porque Cloud Scheduler no existe en Santiago.
 
 ## Dominios
@@ -204,25 +215,52 @@ El TXT `google-site-verification` es de Google Search Console: no borrarlo.
 - **Notificaciones push:** Firebase Cloud Messaging + `web/firebase-messaging-sw.js`. Necesitan la clave
   pública VAPID en `lib/core/push.dart` (`webPushVapidKey`); mientras esté vacía, la app muestra "Muy pronto".
 - **Instalar la app (PWA):** `web/index.html` captura el evento del navegador y la pantalla Cuenta ofrece instalar.
+- **Escáner QR (web):** `web/qr_scanner.js` abre una capa HTML propia sobre la app (cámara con `playsinline`,
+  BarcodeDetector o jsQR). Funciona en Safari de iPhone, Chrome y computadores; si no hay cámara o permiso,
+  explica cómo activarlo y ofrece escribir el código. `mobile_scanner` queda para la futura app nativa.
+- **Código de retiro privado:** vive en `orders/{id}/private/pickup` (solo el cliente) y en
+  `pickupCodes/{local}_{código}` (solo el servidor). El comercio lo valida cuando el cliente se lo muestra.
+- **Pagos al local:** "Por recibir" suma pedidos retirados y no retirados (`no_show`, los marca `markNoShows`
+  1 h después del retiro). El admin liquida por local o con **Liquidar todos**, que entrega una planilla CSV con
+  titular, RUT, banco, cuenta y monto de cada local.
+- **Red de seguridad de pagos:** si el aviso de Mercado Pago no llega, `syncOrderPayment` (al volver del pago o
+  con "Ya pagué, verificar") y `expirePendingOrders` consultan el pago a Mercado Pago antes de vencer la reserva.
+- **Analítica anónima:** `/api/track` suma contadores por día en `stats/` (sin cookies ni datos personales).
+  Admin → Analítica muestra visitas, inscritos, cuentas nuevas y el embudo hasta el retiro.
+- **Modo lanzamiento de la landing:** interruptor en Admin → Interesados (`config/site`). `landing/site.js`
+  muestra los elementos `data-prelaunch` o `data-launch` según ese valor, sin redesplegar.
 - **Fotos (Storage):** se suben a `uploads/{uid}/...` (cada usuario solo escribe en su carpeta, imágenes de
   hasta 5 MB). Así las reglas no dependen de Firestore. Para que la app web pueda mostrarlas, el bucket
   necesita CORS (`storage-cors.json`, se aplica con `node tool/set-storage-cors.mjs`).
 
 ## Correos (Resend)
 
-- Al inscribirse en la lista de espera, `onWaitlistCreated` envía una bienvenida personalizada con el nombre.
-- El remitente se configura en **Admin → Correo**: activar/desactivar, nombre, correo del remitente
-  (`@woowfy.com`, dominio verificado en Resend) y "responder a" (p. ej. tu Gmail). **Enviar prueba a mi
-  correo** manda la bienvenida al admin conectado.
+Plantillas en `functions/src/email.ts` (HTML con la paleta de la marca):
+
+| Correo | Cuándo | Función |
+|---|---|---|
+| Bienvenida | alguien se inscribe en la lista de espera | `onWaitlistCreated` |
+| Confirmación de compra (código de retiro, horario, plazo para cancelar) | el pedido pasa a pagado | `onOrderUpdated` |
+| Aviso de reembolso (monto y motivo) | Mercado Pago confirma el reembolso | `onOrderUpdated` |
+
+- **Admin → Correo:** interruptor general, "Compra y reembolso", remitente (`@woowfy.com`, dominio verificado
+  en Resend) y "responder a". **Ver plantillas (sin enviar)** muestra cada correo con datos de ejemplo;
+  **Enviar prueba a mi correo** manda el que elijas al admin conectado.
+- Vista previa local: `npm --prefix functions run build` y `node tool/preview-emails.mjs` (→ `build/emails/`).
+- Cada correo de pedido se envía una sola vez: queda registrado en el pedido (`sent` / `skipped` / `error`).
 - La API key va en Secret Manager: `firebase functions:secrets:set RESEND_API_KEY` y luego
-  `firebase deploy --only functions:onWaitlistCreated,functions:sendTestEmail`. Hoy tiene un valor provisional.
+  `firebase deploy --only functions:onWaitlistCreated,functions:onOrderUpdated,functions:sendTestEmail`.
+  Hoy tiene un valor provisional: con el interruptor apagado no se envía nada.
 - Correo entrante: `hola@woowfy.com` se reenviará a Gmail con ImprovMX (pendiente de configurar los MX).
 - "Recuperar contraseña" lo envía Firebase Auth (en español), no Resend.
 
 ## Páginas legales
 
 `landing/terms.html` (`/terms`) y `landing/privacy.html` (`/privacy`): **borradores** pendientes de revisión
-legal y de completar los datos de la SpA (marcados en amarillo). Enlazados desde la landing, el formulario
+legal y de completar los datos de la SpA (marcados en amarillo). Actualizados el 29-09-2026 con: código de retiro
+personal, pedidos no retirados, arrepentimiento de 15 min, reembolso de pagos tardíos, comisión y liquidaciones,
+calificaciones públicas con nombre de pila, notificaciones, datos bancarios de comercios, analítica anónima y
+servicios técnicos de terceros (OpenStreetMap, Google Fonts, jsDelivr). Enlazados desde la landing, el formulario
 de lista de espera, el registro, el alta de comercios y la pantalla Cuenta.
 
 ## Diseño y marca
@@ -237,14 +275,18 @@ de lista de espera, el registro, el alta de comercios y la pantalla Cuenta.
 
 ## Pagos (Mercado Pago)
 
-`functions/.env` → `PAYMENTS_PROVIDER=mock` (hoy): checkout simulado, no mueve dinero.
-Con `PAYMENTS_PROVIDER=mercadopago` se usa **Checkout Pro**:
+`functions/.env` → `PAYMENTS_PROVIDER=mercadopago` (**activo desde el 28-09-2026** con una cuenta de prueba: el
+token `APP_USR-` es de un usuario de prueba, así que no se cobra dinero real). Con `mock` el checkout es simulado.
+Compra de punta a punta probada: pago aprobado → webhook → pedido pagado con QR.
+
+Para configurarlo desde cero (**Checkout Pro**):
 
 1. En [Mercado Pago Developers](https://www.mercadopago.cl/developers) → *Tus integraciones* → crear aplicación
    (Checkout Pro). Para probar, usa las **credenciales de prueba** (el Access Token empieza con `TEST-`) y
    **usuarios de prueba** para pagar; no se mueve dinero real.
 2. En la aplicación → *Webhooks* → URL `https://southamerica-west1-woowfy-app.cloudfunctions.net/mercadoPagoWebhook`,
-   evento **Pagos**. Copia la **clave secreta** que muestra.
+   evento **Pagos**. Copia la **clave secreta** que muestra. Si alguna vez la regeneras, guárdala de nuevo:
+   si no calza, el webhook responde 401 y los pedidos quedan pendientes (los rescata la conciliación).
 3. Guarda ambos en Secret Manager (hoy tienen un valor provisional):
    `firebase functions:secrets:set MP_ACCESS_TOKEN` y `firebase functions:secrets:set MP_WEBHOOK_SECRET`.
 4. Cambia `PAYMENTS_PROVIDER=mercadopago` en `functions/.env` y despliega: `firebase deploy --only functions`.

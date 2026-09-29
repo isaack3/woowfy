@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/models.dart';
 import '../../data/repository.dart';
+import 'email_preview.dart';
 
 final _emailRe = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$');
 
@@ -184,7 +185,86 @@ class _FormState extends State<_Form> {
           ),
           const SizedBox(height: 8),
           Text('La prueba usa la configuración guardada y datos de ejemplo.', style: t.bodySmall),
+          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => showDialog<void>(context: context, builder: (_) => const _TemplatesDialog()),
+              icon: const Icon(Icons.visibility_outlined, size: 18),
+              label: const Text('Ver plantillas (sin enviar)'),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+/// Muestra cómo se ve cada correo automático, con datos de ejemplo y sin enviar nada.
+class _TemplatesDialog extends StatefulWidget {
+  const _TemplatesDialog();
+
+  @override
+  State<_TemplatesDialog> createState() => _TemplatesDialogState();
+}
+
+class _TemplatesDialogState extends State<_TemplatesDialog> {
+  static const _kinds = {'welcome': 'Bienvenida', 'purchase': 'Compra', 'refund': 'Reembolso'};
+  String _kind = 'welcome';
+  late Future<({String subject, String html})> _mail = Repository.instance.previewEmail(_kind);
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final size = MediaQuery.sizeOf(context);
+    return Dialog(
+      insetPadding: const EdgeInsets.all(16),
+      child: SizedBox(
+        width: 620,
+        height: size.height * 0.85,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
+              child: Row(children: [
+                Expanded(child: Text('Plantillas de correo', style: t.titleLarge)),
+                IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close), tooltip: 'Cerrar'),
+              ]),
+            ),
+            SegmentedButton<String>(
+              segments: [for (final e in _kinds.entries) ButtonSegment(value: e.key, label: Text(e.value))],
+              selected: {_kind},
+              onSelectionChanged: (v) => setState(() {
+                _kind = v.first;
+                _mail = Repository.instance.previewEmail(_kind);
+              }),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: FutureBuilder<({String subject, String html})>(
+                future: _mail,
+                builder: (context, snap) {
+                  if (snap.hasError) return Center(child: Text('No se pudo cargar: ${snap.error}'));
+                  if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+                  return Column(children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                      child: Row(children: [
+                        Text('Asunto: ', style: t.bodySmall),
+                        Expanded(child: Text(snap.data!.subject, style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w700))),
+                      ]),
+                    ),
+                    Expanded(child: EmailHtmlView(html: snap.data!.html)),
+                  ]);
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Text('Datos de ejemplo. Los correos reales llevan los datos de cada pedido.', style: t.bodySmall),
+            ),
+          ],
+        ),
       ),
     );
   }

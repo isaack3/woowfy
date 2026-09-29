@@ -296,19 +296,33 @@ function sampleOrder(): OrderMail {
   };
 }
 
-/** Admin → Correo → "Enviar prueba": manda un correo de ejemplo al admin con la configuración actual. */
-export const sendTestEmail = onCall({ secrets: [RESEND_API_KEY] }, async (req) => {
-  const uid = req.auth?.uid;
-  const email = req.auth?.token.email;
-  if (!uid || !email) throw new HttpsError("unauthenticated", "Debes iniciar sesión.");
+/** El correo de ejemplo de cada tipo (welcome | purchase | refund), con datos inventados. */
+function sampleEmail(kind: string, name = "") {
+  return kind === "purchase" ? purchaseEmail(sampleOrder())
+    : kind === "refund" ? refundEmail(sampleOrder())
+      : welcomeEmail({ name, type: "cliente" });
+}
+
+async function requireAdmin(uid: string | undefined) {
+  if (!uid) throw new HttpsError("unauthenticated", "Debes iniciar sesión.");
   const user = await getFirestore().doc(`users/${uid}`).get();
   if (user.data()?.role !== "admin") throw new HttpsError("permission-denied", "Solo administradores.");
+  return user.data()!;
+}
 
-  const kind = String(req.data?.kind ?? "welcome");
+/** Admin → Correo → "Ver plantillas": devuelve el asunto y el HTML de ejemplo para mostrarlos sin enviar nada. */
+export const previewEmail = onCall(async (req) => {
+  await requireAdmin(req.auth?.uid);
+  return sampleEmail(String(req.data?.kind ?? "welcome"), "Camila");
+});
+
+/** Admin → Correo → "Enviar prueba": manda un correo de ejemplo al admin con la configuración actual. */
+export const sendTestEmail = onCall({ secrets: [RESEND_API_KEY] }, async (req) => {
+  const user = await requireAdmin(req.auth?.uid);
+  const email = req.auth?.token.email;
+  if (!email) throw new HttpsError("failed-precondition", "Tu cuenta no tiene correo.");
   const s = await emailSettings();
-  const { subject, html } = kind === "purchase" ? purchaseEmail(sampleOrder())
-    : kind === "refund" ? refundEmail(sampleOrder())
-      : welcomeEmail({ name: user.data()?.name ?? "", type: "cliente" });
+  const { subject, html } = sampleEmail(String(req.data?.kind ?? "welcome"), user.name ?? "");
   try {
     const id = await sendEmail(RESEND_API_KEY.value(), s, email, `[Prueba] ${subject}`, html);
     return { id, to: email };

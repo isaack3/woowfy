@@ -227,6 +227,12 @@ class Repository {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
+  /// Asunto y HTML de un correo de ejemplo ([kind] = welcome | purchase | refund), sin enviarlo.
+  Future<({String subject, String html})> previewEmail(String kind) async {
+    final res = await functions.httpsCallable('previewEmail').call<Map<String, dynamic>>({'kind': kind});
+    return (subject: res.data['subject'] as String, html: res.data['html'] as String);
+  }
+
   /// Envía un correo de ejemplo al admin conectado: [kind] = welcome | purchase | refund. Devuelve el destinatario.
   Future<String> sendTestEmail([String kind = 'welcome']) async {
     final res = await functions.httpsCallable('sendTestEmail').call<Map<String, dynamic>>({'kind': kind});
