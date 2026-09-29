@@ -5,6 +5,7 @@ import '../../core/format.dart';
 import '../../core/theme.dart';
 import '../../data/models.dart';
 import 'bag_image.dart';
+import 'stars.dart';
 
 class BagCard extends StatelessWidget {
   const BagCard({super.key, required this.bag, this.distance});
@@ -48,6 +49,7 @@ class BagCard extends StatelessWidget {
                     StoreLogo(url: bag.storeLogoUrl, size: 26),
                     const SizedBox(width: 8),
                     Expanded(child: Text(bag.storeName, style: t.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                    RatingBadge(avg: bag.storeRatingAvg, count: bag.storeRatingCount),
                   ]),
                   const SizedBox(height: 4),
                   Text([bag.title, bag.category, bag.comuna].whereType<String>().where((s) => s.isNotEmpty).join(' · '), style: t.bodySmall?.copyWith(color: WoowfyColors.muted), maxLines: 1, overflow: TextOverflow.ellipsis),

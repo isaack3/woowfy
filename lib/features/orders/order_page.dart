@@ -1,9 +1,12 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../core/checkout.dart';
 import '../../core/format.dart';
+import '../../core/theme.dart';
+import '../bags/stars.dart';
 import '../../data/models.dart';
 import '../../data/repository.dart';
 
@@ -51,7 +54,8 @@ class _Body extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
-    final pickup = 'Retiro ${formatPickupWindow(order.pickupStart, order.pickupEnd)}';
+    final pickup =
+        'Retiro ${formatPickupWindow(order.pickupStart, order.pickupEnd)}';
 
     final header = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -66,16 +70,26 @@ class _Body extends StatelessWidget {
 
     switch (order.status) {
       case OrderStatus.paid:
+        final canCancel = DateTime.now().isBefore(
+          order.pickupStart.subtract(const Duration(hours: cancelHoursBefore)),
+        );
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             header,
-            Text('Muestra este código en el local', style: t.titleMedium, textAlign: TextAlign.center),
+            Text(
+              'Muestra este código en el local',
+              style: t.titleMedium,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 16),
             Center(
               child: Container(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 // El QR contiene solo el código, así el comercio puede escanearlo o tipearlo.
                 child: QrImageView(data: order.pickupCode, size: 220),
               ),
@@ -84,10 +98,27 @@ class _Body extends StatelessWidget {
             SelectableText(
               order.pickupCode,
               textAlign: TextAlign.center,
-              style: t.displaySmall?.copyWith(letterSpacing: 8, fontWeight: FontWeight.w700),
+              style: t.displaySmall?.copyWith(
+                letterSpacing: 8,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 8),
             Text(pickup, textAlign: TextAlign.center, style: t.titleMedium),
+            const SizedBox(height: 24),
+            if (canCancel)
+              TextButton.icon(
+                onPressed: () => _cancel(context, paid: true),
+                icon: const Icon(Icons.cancel_outlined),
+                label: const Text('Cancelar pedido'),
+                style: TextButton.styleFrom(foregroundColor: scheme.error),
+              )
+            else
+              Text(
+                'Ya no se puede cancelar: el plazo es hasta $cancelHoursBefore horas antes del retiro.',
+                textAlign: TextAlign.center,
+                style: t.bodySmall?.copyWith(color: WoowfyColors.muted),
+              ),
           ],
         );
       case OrderStatus.pendingPayment:
@@ -95,13 +126,19 @@ class _Body extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             header,
-            const Text('Tu bolsa está reservada por 15 minutos mientras completas el pago.'),
+            const Text(
+              'Tu bolsa está reservada por 15 minutos mientras completas el pago.',
+            ),
             const SizedBox(height: 16),
             if (order.checkoutUrl != null)
               FilledButton(
                 onPressed: () => openCheckout(context, order.checkoutUrl!),
                 child: const Text('Completar pago'),
               ),
+            TextButton(
+              onPressed: () => _cancel(context, paid: false),
+              child: const Text('Cancelar reserva'),
+            ),
           ],
         );
       case OrderStatus.pickedUp:
@@ -111,20 +148,233 @@ class _Body extends StatelessWidget {
             header,
             Icon(Icons.check_circle, size: 72, color: scheme.primary),
             const SizedBox(height: 8),
-            Text('¡Retirado! Gracias por rescatar comida', textAlign: TextAlign.center, style: t.titleMedium),
+            Text(
+              '¡Retirado! Gracias por rescatar comida',
+              textAlign: TextAlign.center,
+              style: t.titleMedium,
+            ),
+            const SizedBox(height: 24),
+            order.rating == null
+                ? _RateCard(orderId: order.id)
+                : Column(
+                    children: [
+                      Stars(value: order.rating!.toDouble(), size: 28),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Gracias por calificar',
+                        style: t.bodySmall?.copyWith(color: WoowfyColors.muted),
+                      ),
+                    ],
+                  ),
           ],
         );
       case OrderStatus.cancelled:
+        final (why, refundable) = switch (order.cancelReason) {
+          'customer' => ('Cancelaste este pedido.', true),
+          'store' => (
+            'El local canceló la bolsa${order.storeMessage == null ? '.' : ': ${order.storeMessage}'}',
+            true,
+          ),
+          'payment_timeout' => (
+            'La reserva venció porque el pago no se completó a tiempo.',
+            false,
+          ),
+          'payment_rejected' => ('El pago no fue aprobado.', false),
+          _ => ('Este pedido fue cancelado.', false),
+        };
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             header,
-            Text('Este pedido fue cancelado (pago no completado).',
-                style: TextStyle(color: scheme.error)),
+            Text(why, style: t.titleMedium),
+            if (refundable || order.refundStatus != null) ...[
+              const SizedBox(height: 12),
+              _RefundStatus(status: order.refundStatus, amount: order.amount),
+            ],
             const SizedBox(height: 16),
-            OutlinedButton(onPressed: () => context.go('/'), child: const Text('Ver otras bolsas')),
+            OutlinedButton(
+              onPressed: () => context.go('/'),
+              child: const Text('Ver otras bolsas'),
+            ),
           ],
         );
     }
+  }
+
+  Future<void> _cancel(BuildContext context, {required bool paid}) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(paid ? 'Cancelar pedido' : 'Cancelar reserva'),
+        content: Text(
+          paid
+              ? 'Te devolveremos ${formatClp(order.amount)} al mismo medio de pago. La bolsa quedará disponible para otra persona.'
+              : 'La bolsa quedará disponible para otra persona.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Volver'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Sí, cancelar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final refunded = await Repository.instance.cancelOrder(order.id);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            refunded
+                ? 'Pedido cancelado. Te devolvimos el dinero.'
+                : 'Reserva cancelada.',
+          ),
+        ),
+      );
+    } on FirebaseFunctionsException catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(e.message ?? 'No se pudo cancelar.')),
+      );
+    }
+  }
+}
+
+class _RefundStatus extends StatelessWidget {
+  const _RefundStatus({required this.status, required this.amount});
+
+  final String? status;
+  final int amount;
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, text, bg) = switch (status) {
+      'done' => (
+        Icons.check_circle_outline,
+        'Reembolso de ${formatClp(amount)} realizado. Puede tardar unos días en verse en tu medio de pago.',
+        WoowfyColors.limeSoft,
+      ),
+      'error' => (
+        Icons.error_outline,
+        'No pudimos procesar el reembolso automáticamente. Te contactaremos; escríbenos a hola@woowfy.com.',
+        const Color(0xFFFFE0D9),
+      ),
+      _ => (
+        Icons.schedule,
+        'Reembolso de ${formatClp(amount)} en proceso.',
+        WoowfyColors.orangeSoft,
+      ),
+    };
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: WoowfyColors.green),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Calificar un pedido retirado: estrellas y comentario opcional.
+class _RateCard extends StatefulWidget {
+  const _RateCard({required this.orderId});
+
+  final String orderId;
+
+  @override
+  State<_RateCard> createState() => _RateCardState();
+}
+
+class _RateCardState extends State<_RateCard> {
+  int _rating = 0;
+  final _comment = TextEditingController();
+  bool _sending = false;
+
+  @override
+  void dispose() {
+    _comment.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    setState(() => _sending = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await Repository.instance.rateOrder(
+        widget.orderId,
+        _rating,
+        _comment.text.trim(),
+      );
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('¡Gracias! Tu calificación ayuda a otros a elegir.'),
+        ),
+      );
+    } on FirebaseFunctionsException catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(e.message ?? 'No se pudo enviar.')),
+      );
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Text('¿Cómo estuvo tu bolsa?', style: t.titleMedium),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                for (var i = 1; i <= 5; i++)
+                  IconButton(
+                    tooltip: '$i de 5',
+                    iconSize: 36,
+                    onPressed: () => setState(() => _rating = i),
+                    icon: Icon(
+                      i <= _rating
+                          ? Icons.star_rounded
+                          : Icons.star_outline_rounded,
+                      color: WoowfyColors.orange,
+                    ),
+                  ),
+              ],
+            ),
+            if (_rating > 0) ...[
+              const SizedBox(height: 8),
+              TextField(
+                controller: _comment,
+                maxLines: 2,
+                maxLength: 500,
+                decoration: const InputDecoration(
+                  labelText: 'Cuéntanos más (opcional)',
+                ),
+              ),
+              const SizedBox(height: 8),
+              FilledButton(
+                onPressed: _sending ? null : _send,
+                child: Text(_sending ? 'Enviando…' : 'Enviar calificación'),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -23,6 +23,63 @@ class Repository {
       .snapshots()
       .map((s) => s.docs.map(Bag.fromDoc).toList());
 
+  // --- Cancelaciones, calificaciones y liquidaciones -----------------------------
+
+  /// El cliente cancela su pedido. Devuelve true si hubo reembolso.
+  Future<bool> cancelOrder(String orderId) async {
+    final res = await functions.httpsCallable('cancelOrder').call<Map<String, dynamic>>({'orderId': orderId});
+    return res.data['refunded'] as bool? ?? false;
+  }
+
+  /// El comercio cancela la bolsa del día (reembolsa y avisa a quienes la compraron).
+  Future<int> cancelBag(String bagId, String reason) async {
+    final res = await functions.httpsCallable('cancelBag').call<Map<String, dynamic>>({'bagId': bagId, 'reason': reason});
+    return (res.data['cancelledOrders'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<void> rateOrder(String orderId, int rating, String comment) =>
+      functions.httpsCallable('rateOrder').call({'orderId': orderId, 'rating': rating, 'comment': comment});
+
+  Stream<List<Review>> watchStoreReviews(String storeId, {int limit = 20}) => _db
+      .collection('reviews')
+      .where('storeId', isEqualTo: storeId)
+      .orderBy('createdAt', descending: true)
+      .limit(limit)
+      .snapshots()
+      .map((s) => s.docs.map(Review.fromDoc).toList());
+
+  /// Pedidos de un local desde una fecha (panel de ventas del comercio y admin).
+  Stream<List<BagOrder>> watchStoreOrdersSince(String storeId, DateTime since) => _db
+      .collection('orders')
+      .where('storeId', isEqualTo: storeId)
+      .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(since))
+      .orderBy('createdAt', descending: true)
+      .limit(1000)
+      .snapshots()
+      .map((s) => s.docs.map(BagOrder.fromDoc).toList());
+
+  /// Pedidos retirados que aún no se le pagan al comercio.
+  Stream<List<BagOrder>> watchUnpaidPickedUp(String storeId) => _db
+      .collection('orders')
+      .where('storeId', isEqualTo: storeId)
+      .where('status', isEqualTo: OrderStatus.pickedUp.value)
+      .snapshots()
+      .map((s) => s.docs.map(BagOrder.fromDoc).where((o) => o.payoutId == null).toList());
+
+  Stream<List<Payout>> watchPayouts(String storeId) => _db
+      .collection('payouts')
+      .where('storeId', isEqualTo: storeId)
+      .orderBy('createdAt', descending: true)
+      .limit(50)
+      .snapshots()
+      .map((s) => s.docs.map(Payout.fromDoc).toList());
+
+  /// Admin: registra el pago de las ventas pendientes de un local.
+  Future<int> createPayout(String storeId, String note) async {
+    final res = await functions.httpsCallable('createPayout').call<Map<String, dynamic>>({'storeId': storeId, 'note': note});
+    return (res.data['storeAmount'] as num).toInt();
+  }
+
   Stream<Bag?> watchBag(String id) =>
       _bags.doc(id).snapshots().map((d) => d.exists ? Bag.fromDoc(d) : null);
 

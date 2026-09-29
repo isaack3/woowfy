@@ -7,6 +7,7 @@ import '../features/auth/login_page.dart';
 import '../features/bags/bag_detail_page.dart';
 import '../features/home/home_page.dart';
 import '../features/merchant/merchant_page.dart';
+import '../features/merchant/merchant_sales_page.dart';
 import '../features/orders/mock_checkout_page.dart';
 import '../features/orders/my_orders_page.dart';
 import '../features/orders/order_page.dart';
@@ -23,6 +24,8 @@ final appRouter = GoRouter(
     if (!loggedIn && _protectedPrefixes.any(path.startsWith)) {
       return '/login?from=${Uri.encodeComponent(state.uri.toString())}';
     }
+    // Con sesión, el login no tiene sentido: sigue a donde ibas.
+    if (loggedIn && path == '/login') return state.uri.queryParameters['from'] ?? '/';
     return null;
   },
   routes: [
@@ -44,6 +47,7 @@ final appRouter = GoRouter(
       builder: (context, state) => LoginPage(redirectTo: state.uri.queryParameters['from'] ?? '/'),
     ),
     GoRoute(path: '/merchant', builder: (context, state) => const MerchantPage()),
+    GoRoute(path: '/merchant/sales', builder: (context, state) => const MerchantSalesPage()),
     GoRoute(path: '/admin', builder: (context, state) => const AdminPage()),
     GoRoute(
       path: '/order/:id',

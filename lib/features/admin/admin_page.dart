@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/theme.dart';
 import '../../data/models.dart';
 import '../../data/repository.dart';
 import 'email_settings_tab.dart';
@@ -81,7 +82,85 @@ class _AdminShell extends StatelessWidget {
           ),
         ),
         body: const TabBarView(
-          children: [PendingStoresTab(), StoresTab(), SalesTab(), WaitlistTab(), UsersTab(), EmailSettingsTab()],
+          children: [
+            _Section(
+              icon: Icons.storefront_outlined,
+              info: 'Locales que pidieron sumarse a Woowfy. Revisa sus datos y apruébalos para que puedan publicar bolsas, o recházalos indicando el motivo.',
+              child: PendingStoresTab(),
+            ),
+            _Section(
+              icon: Icons.store_outlined,
+              info: 'Locales ya revisados: aprobados, suspendidos o rechazados. Con “Liquidar” registras el pago de sus ventas retiradas.',
+              child: StoresTab(),
+            ),
+            _Section(
+              icon: Icons.insights_outlined,
+              info: 'Resumen de pedidos de toda la plataforma: bolsas vendidas, ventas totales y la comisión de Woowfy en el periodo elegido.',
+              child: SalesTab(),
+            ),
+            _Section(
+              icon: Icons.mark_email_unread_outlined,
+              info: 'Personas y locales que se inscribieron en la lista de espera de woowfy.com. Puedes copiar sus correos o exportarlos.',
+              child: WaitlistTab(),
+            ),
+            _Section(
+              icon: Icons.group_outlined,
+              info: 'Cuentas registradas en la app. Desde aquí das o quitas permisos de administrador.',
+              child: UsersTab(),
+            ),
+            _Section(
+              icon: Icons.alternate_email,
+              info: 'Remitente y correo de respuesta de los mensajes automáticos (bienvenida a la lista de espera y otros avisos).',
+              child: EmailSettingsTab(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Contenido de una pestaña: centrado con ancho máximo y una breve explicación arriba.
+class _Section extends StatelessWidget {
+  const _Section({required this.icon, required this.info, required this.child});
+
+  final IconData icon;
+  final String info;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 960),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: WoowfyColors.limeSoft,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(icon, size: 20, color: WoowfyColors.green),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        info,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: WoowfyColors.green, height: 1.35),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Expanded(child: child),
+          ],
         ),
       ),
     );

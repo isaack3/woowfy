@@ -64,6 +64,8 @@ async function ensureTodayBag(templateId: string, t: Template, now = new Date())
       category: store.category ?? null,
       comuna: store.comuna,
       region: store.region ?? "",
+      storeRatingAvg: store.ratingAvg ?? null,
+      storeRatingCount: store.ratingCount ?? 0,
       lat: store.lat ?? null,
       lng: store.lng ?? null,
       address: store.address,

@@ -23,6 +23,8 @@ class Bag {
     this.templateId,
     this.lat,
     this.lng,
+    this.storeRatingAvg,
+    this.storeRatingCount = 0,
   });
 
   final String id;
@@ -46,6 +48,8 @@ class Bag {
   final String? templateId;
   final double? lat;
   final double? lng;
+  final double? storeRatingAvg;
+  final int storeRatingCount;
 
   bool get hasLocation => lat != null && lng != null;
 
@@ -81,6 +85,8 @@ class Bag {
       templateId: d['templateId'] as String?,
       lat: (d['lat'] as num?)?.toDouble(),
       lng: (d['lng'] as num?)?.toDouble(),
+      storeRatingAvg: (d['storeRatingAvg'] as num?)?.toDouble(),
+      storeRatingCount: (d['storeRatingCount'] as num?)?.toInt() ?? 0,
     );
   }
 }
@@ -119,6 +125,8 @@ class Store {
     this.logoUrl,
     this.lat,
     this.lng,
+    this.ratingAvg,
+    this.ratingCount = 0,
   });
 
   final String id;
@@ -140,6 +148,8 @@ class Store {
   final String? logoUrl;
   final double? lat;
   final double? lng;
+  final double? ratingAvg;
+  final int ratingCount;
 
   bool get approved => status == StoreStatus.approved;
 
@@ -163,6 +173,8 @@ class Store {
       logoUrl: d['logoUrl'] as String?,
       lat: (d['lat'] as num?)?.toDouble(),
       lng: (d['lng'] as num?)?.toDouble(),
+      ratingAvg: (d['ratingAvg'] as num?)?.toDouble(),
+      ratingCount: (d['ratingCount'] as num?)?.toInt() ?? 0,
     );
   }
 }
@@ -199,6 +211,12 @@ class BagOrder {
     this.imageUrl,
     this.originalPrice,
     this.platformFee = 0,
+    this.storeAmount = 0,
+    this.cancelReason,
+    this.storeMessage,
+    this.refundStatus,
+    this.rating,
+    this.payoutId,
     this.createdAt,
   });
 
@@ -210,6 +228,18 @@ class BagOrder {
   final int? originalPrice;
   /// Comisión de Woowfy incluida en [amount].
   final int platformFee;
+  /// Lo que recibe el comercio ([amount] − [platformFee]).
+  final int storeAmount;
+  /// customer | store | payment_timeout | payment_rejected
+  final String? cancelReason;
+  /// Mensaje del local cuando cancela la bolsa.
+  final String? storeMessage;
+  /// pending | done | error (si hubo reembolso).
+  final String? refundStatus;
+  /// Calificación que dio el cliente (1–5), si ya calificó.
+  final int? rating;
+  /// Liquidación en la que se le pagó este pedido al comercio.
+  final String? payoutId;
   final DateTime? createdAt;
   final String address;
   final String comuna;
@@ -239,6 +269,12 @@ class BagOrder {
       imageUrl: d['imageUrl'] as String?,
       originalPrice: (d['originalPrice'] as num?)?.toInt(),
       platformFee: (d['platformFee'] as num?)?.toInt() ?? 0,
+      storeAmount: (d['storeAmount'] as num?)?.toInt() ?? 0,
+      cancelReason: d['cancelReason'] as String?,
+      storeMessage: d['storeMessage'] as String?,
+      refundStatus: (d['refund'] as Map<String, dynamic>?)?['status'] as String?,
+      rating: (d['rating'] as num?)?.toInt(),
+      payoutId: d['payoutId'] as String?,
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
     );
   }
@@ -405,6 +441,70 @@ class AppUser {
       email: d['email'] as String? ?? '',
       name: d['name'] as String? ?? '',
       role: d['role'] as String? ?? 'customer',
+      createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
+    );
+  }
+}
+
+/// Horas antes del inicio del retiro hasta las que el cliente puede cancelar (igual que en /terms y en el servidor).
+const cancelHoursBefore = 2;
+
+/// "4,6" para mostrar notas.
+String formatRating(double v) => v.toStringAsFixed(1).replaceAll('.', ',');
+
+/// Calificación de un pedido retirado (colección `reviews`, id = id del pedido).
+class Review {
+  const Review({required this.id, required this.userName, required this.rating, required this.comment, required this.bagTitle, this.createdAt});
+
+  final String id;
+  final String userName;
+  final int rating;
+  final String comment;
+  final String bagTitle;
+  final DateTime? createdAt;
+
+  factory Review.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final d = doc.data()!;
+    return Review(
+      id: doc.id,
+      userName: d['userName'] as String? ?? 'Cliente',
+      rating: (d['rating'] as num).toInt(),
+      comment: d['comment'] as String? ?? '',
+      bagTitle: d['bagTitle'] as String? ?? '',
+      createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
+    );
+  }
+}
+
+/// Pago de Woowfy a un comercio (colección `payouts`).
+class Payout {
+  const Payout({
+    required this.id,
+    required this.orderCount,
+    required this.grossAmount,
+    required this.platformFee,
+    required this.storeAmount,
+    required this.note,
+    this.createdAt,
+  });
+
+  final String id;
+  final int orderCount;
+  final int grossAmount;
+  final int platformFee;
+  final int storeAmount;
+  final String note;
+  final DateTime? createdAt;
+
+  factory Payout.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final d = doc.data()!;
+    return Payout(
+      id: doc.id,
+      orderCount: (d['orderCount'] as num).toInt(),
+      grossAmount: (d['grossAmount'] as num).toInt(),
+      platformFee: (d['platformFee'] as num).toInt(),
+      storeAmount: (d['storeAmount'] as num).toInt(),
+      note: d['note'] as String? ?? '',
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
     );
   }

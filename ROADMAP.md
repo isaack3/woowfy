@@ -1,20 +1,21 @@
 # Woowfy — Hoja de ruta
 
 Marketplace de bolsas sorpresa contra el desperdicio de comida. Chile primero, luego Latam.
-Marca las casillas a medida que avancemos. Última actualización: 28-09-2026.
+Marca las casillas a medida que avancemos. Última actualización: 28-09-2026 (Sprint 3).
 
 **En línea:** [woowfy.com](https://woowfy.com) (landing) · [app.woowfy.com](https://app.woowfy.com) (app)
 
 ## 📍 Dónde quedamos (28-09-2026)
 
-MVP técnico completo con pago **simulado**: clientes (lista, mapa, favoritos, reserva, QR, impacto),
-comercios (perfil, bolsas y recurrentes, validar retiro con cámara) y admin (solicitudes, comercios, ventas,
-interesados, usuarios, correo). Sprints 1 y 2 terminados y desplegados. La landing está "en construcción"
-con lista de espera.
+MVP técnico completo con pago **simulado** y Mercado Pago **listo para probar** con credenciales de prueba:
+clientes (lista, mapa, favoritos, reserva, QR, cancelar con reembolso, calificar, impacto), comercios (perfil,
+bolsas y recurrentes, cancelar bolsa, validar retiro con cámara, ventas y pagos) y admin (solicitudes,
+comercios y liquidaciones, ventas, interesados, usuarios, correo). Sprints 1, 2 y 3 terminados y desplegados.
+La landing está "en construcción" con lista de espera.
 
-**Para retomar, primero lo que depende de ti** (sección "Pendiente" más abajo): clave VAPID para activar
-las notificaciones, cuenta de Resend, reenvío de correo con ImprovMX y revisar el mapa en la app.
-Luego, decidir el Sprint 3 o avanzar con la SpA y Mercado Pago (Fase 2).
+**Para retomar, primero lo que depende de ti** (sección "Pendiente" más abajo): credenciales de prueba de
+Mercado Pago, clave VAPID, Resend e ImprovMX. Después: probar pagos de punta a punta con usuarios de prueba,
+constituir la SpA y pasar a credenciales de producción.
 
 ---
 
@@ -101,15 +102,23 @@ El QR contiene el mismo código de 6 caracteres que aparece debajo: el comercio 
 - [x] Instalar la app (PWA) desde Cuenta
 - [ ] **Activar push:** generar la clave VAPID en la consola y ponerla en `lib/core/push.dart`
 
-### Sprint 3 — confianza y operación (propuesto, por decidir)
-- [ ] Calificar el retiro (1–5 estrellas) y nota visible del local
-- [ ] Cancelar pedido hasta X horas antes, con reembolso (necesario con pagos reales)
-- [ ] Cancelar bolsas del día con aviso a los clientes
-- [ ] Historial de ventas y liquidaciones para el comercio
+### Sprint 3 — confianza y operación ✅
+- [x] Calificar el retiro (1–5 estrellas y comentario), nota del local en tarjetas y detalle, opiniones
+- [x] Cancelar pedido hasta 2 horas antes, con reembolso automático
+- [x] El comercio cancela la bolsa del día: reembolso y aviso push a los compradores
+- [x] Ventas y pagos del comercio (`/merchant/sales`) y liquidaciones desde Admin → Comercios → Liquidar
+- [x] Mercado Pago Checkout Pro + webhook firmado + reembolsos (listo, falta cargar credenciales de prueba)
+- [x] Arreglo: al abrir directo una ruta protegida ya no manda al login si hay sesión
+
+### Próximo (por decidir)
 - [ ] Analítica (visitas y conversión de landing y app)
-- [ ] Más adelante: empleados por local, reclamos y moderación, invitar amigos (referidos)
+- [ ] Empleados por local, reclamos y moderación de opiniones, invitar amigos (referidos)
+- [ ] Correo de confirmación de compra y de reembolso (cuando Resend esté activo)
 
 ### Pendiente (depende de ti)
+- [ ] 💳 **Compra de prueba con Mercado Pago:** MP ya está activo con cuenta de prueba y el webhook responde 200;
+      falta pagar con el comprador de prueba y ver que el pedido pase a "Pagado" con su QR
+- [ ] Confirmar en tu navegador que al recargar `app.woowfy.com/merchant` sigues con sesión
 - [ ] 🔔 **Clave VAPID** para notificaciones push: consola Firebase → Configuración del proyecto → Cloud Messaging
       → Certificados push web → Generar. La clave pública va en `lib/core/push.dart` y se redespliega la app.
 - [ ] ✉️ **Activar correos:** cuenta Resend + verificar `woowfy.com` (DNS en Piensa Solutions) +
@@ -130,25 +139,27 @@ El QR contiene el mismo código de 6 caracteres que aparece debajo: el comercio 
 - [x] Usuario admin en producción y tu local "Woowfy App" aprobado
 - [x] Fotos visibles en la app (CORS del bucket de Storage)
 - [x] Imagen para compartir en redes (`og:image`) en la landing
+- [x] Mercado Pago de prueba configurado (app Woowfy, token, clave del webhook regenerada, simulación 200)
+- [x] Escáner QR en computador: usa la webcam, botón para cambiar de cámara y ayuda si no hay imagen
+- [x] Admin: explicación breve en cada pestaña y contenido centrado
 
 ## Fase 2 — Pagos reales y operación
 
 - [ ] **Constituir la SpA** (ver sección "Empresa" abajo) ← bloquea el cobro real
 - [ ] Cuenta Mercado Pago **a nombre de la SpA**
-- [ ] Implementar `MercadoPagoProvider` en `functions/src/payments.ts` (Checkout Pro) +
-      webhook `mercadoPagoWebhook` que llama a `markOrderPaid`
-- [ ] Probar con **credenciales de prueba** de Mercado Pago (ver "Pagos" abajo)
+- [x] Implementar `MercadoPagoProvider` (Checkout Pro) + webhook `mercadoPagoWebhook` firmado + reembolsos (Sprint 3)
+- [~] Probar con **credenciales de prueba** de Mercado Pago: configurado, falta la compra de punta a punta
 - [ ] Definir cómo se paga a los comercios:
       - Opción A: **Split de Mercado Pago (Marketplace)** — cada comercio conecta su cuenta MP y
         recibe su parte directo; Woowfy cobra `marketplace_fee`. Más limpio contable y legalmente.
       - Opción B: todo entra a la SpA y se liquida semanalmente por transferencia. Más simple al inicio,
         pero la SpA maneja dinero de terceros (revisar con contador).
-- [ ] Reembolsos (bolsa no entregada / local cerrado)
+- [x] Reembolsos: cancelación del cliente, del comercio y pagos tardíos (Sprint 3)
 - [x] Escanear QR con la cámara en el panel del comercio (Sprint 1)
 - [x] Notificaciones "tu favorito publicó bolsas" y recordatorio de retiro (Sprint 2; falta la clave VAPID)
 - [ ] Correo de confirmación de compra (cuando Resend esté activo)
 - [x] Favoritos (Sprint 2)
-- [ ] Reportes para el comercio (ventas, kg rescatados, liquidaciones)
+- [x] Ventas y liquidaciones para el comercio (Sprint 3)
 
 ## Fase 3 — Tracción y apps móviles
 

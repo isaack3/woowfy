@@ -13,6 +13,11 @@ service cloud.firestore {
       return signedIn()
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
+    // Campos que solo escriben las Cloud Functions (la nota del local no la puede tocar el comercio).
+    function touchesRating(before, after) {
+      return after.diff(before).affectedKeys().hasAny(['ratingSum', 'ratingCount', 'ratingAvg', 'storeRatingAvg', 'storeRatingCount']);
+    }
+
     function ownsApprovedStore(storeId) {
       let store = get(/databases/$(database)/documents/stores/$(storeId)).data;
       return signedIn() && store.ownerUid == request.auth.uid && store.status == 'approved';
@@ -45,6 +50,7 @@ service cloud.firestore {
       allow update: if isAdmin() || (signedIn()
         && resource.data.ownerUid == request.auth.uid
         && request.resource.data.ownerUid == resource.data.ownerUid
+        && !touchesRating(resource.data, request.resource.data)
         && (request.resource.data.status == resource.data.status
           || (resource.data.status == 'rejected' && request.resource.data.status == 'pending')));
     }
@@ -55,10 +61,12 @@ service cloud.firestore {
         || isAdmin();
       allow create: if ownsApprovedStore(request.resource.data.storeId)
         && request.resource.data.price > 0
-        && request.resource.data.price < request.resource.data.originalPrice;
+        && request.resource.data.price < request.resource.data.originalPrice
+        && !request.resource.data.keys().hasAny(['storeRatingAvg', 'storeRatingCount']);
       // El admin puede pausar bolsas (p. ej. al suspender un comercio).
       allow update: if isAdmin() || (ownsApprovedStore(resource.data.storeId)
-        && request.resource.data.storeId == resource.data.storeId);
+        && request.resource.data.storeId == resource.data.storeId
+        && !touchesRating(resource.data, request.resource.data));
       allow delete: if ownsApprovedStore(resource.data.storeId) || isAdmin();
     }
 
@@ -84,6 +92,18 @@ service cloud.firestore {
     // Lista de espera de la landing: la escribe la función joinWaitlist, solo el admin la lee.
     match /waitlist/{id} {
       allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Calificaciones: públicas; solo las crea la función rateOrder.
+    match /reviews/{orderId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Liquidaciones a comercios: las crea createPayout (admin); el comercio ve las suyas.
+    match /payouts/{id} {
+      allow read: if isAdmin() || ownsApprovedStore(resource.data.storeId);
       allow write: if false;
     }
 

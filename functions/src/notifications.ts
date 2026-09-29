@@ -34,7 +34,13 @@ export async function pushToUser(uid: string, title: string, body: string, link:
 /** Un local publica una bolsa → avisa a quienes lo tienen en favoritos. */
 export const onBagCreated = onDocumentCreated("bags/{bagId}", async (event) => {
   const bag = event.data?.data();
-  if (!bag?.active) return;
+  if (!bag) return;
+  // La nota del local la pone el servidor (las reglas no dejan que el comercio la escriba).
+  const store = (await getFirestore().doc(`stores/${bag.storeId}`).get()).data();
+  if (store?.ratingCount) {
+    await event.data!.ref.update({ storeRatingAvg: store.ratingAvg, storeRatingCount: store.ratingCount });
+  }
+  if (!bag.active) return;
   const favs = await getFirestore().collectionGroup("favorites").where("storeId", "==", bag.storeId).get();
   let sent = 0;
   for (const f of favs.docs) {

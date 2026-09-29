@@ -1,6 +1,8 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/format.dart';
 import '../../data/models.dart';
 import '../../data/repository.dart';
 
@@ -63,6 +65,10 @@ class _StoresTabState extends State<StoresTab> {
             empty: 'No hay comercios en este estado.',
             actions: (store) => switch (store.status) {
               StoreStatus.approved => [
+                  FilledButton.tonal(
+                    onPressed: () => showDialog<void>(context: context, builder: (_) => _PayoutDialog(store: store)),
+                    child: const Text('Liquidar'),
+                  ),
                   OutlinedButton(
                     onPressed: () => _changeStatus(context, store, StoreStatus.suspended,
                         askReason: 'Motivo de la suspensión (lo verá el comercio)'),
@@ -239,6 +245,82 @@ class _ReasonDialogState extends State<_ReasonDialog> {
           child: const Text('Confirmar'),
         ),
       ],
+    );
+  }
+}
+
+/// Registrar el pago al comercio de sus ventas retiradas que aún no se le pagan.
+class _PayoutDialog extends StatefulWidget {
+  const _PayoutDialog({required this.store});
+
+  final Store store;
+
+  @override
+  State<_PayoutDialog> createState() => _PayoutDialogState();
+}
+
+class _PayoutDialogState extends State<_PayoutDialog> {
+  final _note = TextEditingController();
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final amount = await Repository.instance.createPayout(widget.store.id, _note.text.trim());
+      if (mounted) Navigator.pop(context);
+      messenger.showSnackBar(SnackBar(content: Text('Pago de ${formatClp(amount)} a ${widget.store.name} registrado.')));
+    } on FirebaseFunctionsException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message ?? 'No se pudo registrar.')));
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<BagOrder>>(
+      stream: Repository.instance.watchUnpaidPickedUp(widget.store.id),
+      builder: (context, snap) {
+        final orders = snap.data ?? const <BagOrder>[];
+        final gross = orders.fold<int>(0, (s, o) => s + o.amount);
+        final toPay = orders.fold<int>(0, (s, o) => s + o.storeAmount);
+        return AlertDialog(
+          title: Text('Liquidar a ${widget.store.name}'),
+          content: SizedBox(
+            width: 420,
+            child: !snap.hasData
+                ? const SizedBox(height: 80, child: Center(child: CircularProgressIndicator()))
+                : Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    if (orders.isEmpty)
+                      const Text('No tiene ventas retiradas pendientes de pago.')
+                    else ...[
+                      Text('${orders.length} ${orders.length == 1 ? 'bolsa retirada' : 'bolsas retiradas'} sin liquidar'),
+                      Text('Ventas ${formatClp(gross)} − comisión ${formatClp(gross - toPay)}'),
+                      const SizedBox(height: 8),
+                      Text('A pagar: ${formatClp(toPay)}', style: Theme.of(context).textTheme.titleLarge),
+                      const SizedBox(height: 12),
+                      const Text('Haz la transferencia al comercio y regístrala aquí:'),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _note,
+                        decoration: const InputDecoration(labelText: 'Nota (p. ej. n° de transferencia)'),
+                      ),
+                    ],
+                  ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar')),
+            if (orders.isNotEmpty)
+              FilledButton(onPressed: _saving ? null : _save, child: Text(_saving ? 'Registrando…' : 'Registrar pago')),
+          ],
+        );
+      },
     );
   }
 }

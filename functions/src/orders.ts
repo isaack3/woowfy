@@ -1,8 +1,10 @@
 import { randomInt } from "node:crypto";
 import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
-import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { logger } from "firebase-functions/v2";
+import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { paymentProvider } from "./payments.js";
+import { pushToUser } from "./notifications.js";
+import { mercadoPago, PAYMENT_SECRETS, paymentProvider, validMercadoPagoSignature } from "./payments.js";
 
 /** Comisión de Woowfy sobre cada bolsa vendida. Ajustar según validación con comercios. */
 const PLATFORM_FEE_RATE = 0.25;
@@ -10,6 +12,8 @@ const PLATFORM_FEE_RATE = 0.25;
 const PAYMENT_TIMEOUT_MINUTES = 15;
 /** Margen para validar un retiro después del fin del horario. */
 const REDEEM_GRACE_MINUTES = 60;
+/** El cliente puede cancelar (con reembolso) hasta estas horas antes del inicio del retiro (ver /terms). */
+export const CANCEL_HOURS_BEFORE = 2;
 
 // Sin caracteres ambiguos (0/O, 1/I/L) para que se pueda dictar o tipear.
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -26,7 +30,7 @@ function requireUid(uid: string | undefined): string {
 }
 
 /** Reserva una unidad de la bolsa, crea la orden y devuelve la URL de pago. */
-export const createOrder = onCall(async (req) => {
+export const createOrder = onCall({ secrets: PAYMENT_SECRETS }, async (req) => {
   const uid = requireUid(req.auth?.uid);
   const bagId = req.data?.bagId;
   if (typeof bagId !== "string" || !bagId) {
@@ -77,6 +81,7 @@ export const createOrder = onCall(async (req) => {
     title: `${order.bagTitle} · ${order.storeName}`,
     amount: order.amount,
     payerEmail: req.auth?.token.email,
+    expiresAt: order.expiresAt.toDate(),
   });
   await orderRef.update({
     payment: { provider: provider.name, externalId: checkout.externalId ?? null, checkoutUrl: checkout.url },
@@ -84,20 +89,42 @@ export const createOrder = onCall(async (req) => {
   return { orderId: orderRef.id, checkoutUrl: checkout.url };
 });
 
-/** Marca la orden como pagada. La usarán tanto el mock como el webhook de Mercado Pago. */
-export async function markOrderPaid(orderId: string, externalPaymentId: string): Promise<void> {
+/**
+ * Marca la orden como pagada. La usan el mock y el webhook de Mercado Pago.
+ * Devuelve "late" si el pago llegó cuando la reserva ya había vencido (hay que reembolsarlo).
+ */
+export async function markOrderPaid(orderId: string, externalPaymentId: string): Promise<"paid" | "late" | "noop"> {
   const db = getFirestore();
   const ref = db.collection("orders").doc(orderId);
-  await db.runTransaction(async (tx) => {
+  return db.runTransaction(async (tx) => {
     const order = (await tx.get(ref)).data();
     if (!order) throw new HttpsError("not-found", "Orden no encontrada.");
-    if (order.status !== "pending_payment") return; // idempotente: los webhooks se repiten
-    tx.update(ref, {
-      status: "paid",
-      paidAt: FieldValue.serverTimestamp(),
-      "payment.paymentId": externalPaymentId,
-    });
+    if (order.status === "pending_payment") {
+      tx.update(ref, { status: "paid", paidAt: FieldValue.serverTimestamp(), "payment.paymentId": externalPaymentId });
+      return "paid";
+    }
+    // Pagó después de que venció la reserva: se registra el pago para reembolsarlo.
+    if (order.status === "cancelled" && !order.payment?.paymentId) {
+      tx.update(ref, { "payment.paymentId": externalPaymentId });
+      return "late";
+    }
+    return "noop"; // idempotente: los webhooks se repiten
   });
+}
+
+/** Reembolsa un pedido cancelado que ya estaba pagado y deja registro del resultado. */
+async function refundOrder(orderId: string): Promise<void> {
+  const ref = getFirestore().collection("orders").doc(orderId);
+  const order = (await ref.get()).data();
+  const paymentId = order?.payment?.paymentId;
+  if (!order || !paymentId || order.refund?.status === "done") return;
+  try {
+    const refundId = await paymentProvider().refund(paymentId, orderId);
+    await ref.update({ refund: { status: "done", id: refundId, amount: order.amount, at: FieldValue.serverTimestamp() } });
+  } catch (e) {
+    logger.error("Reembolso falló", orderId, e);
+    await ref.update({ refund: { status: "error", error: String((e as Error).message).slice(0, 300), amount: order.amount } });
+  }
 }
 
 /** Cancela una orden pendiente y devuelve la unidad al stock de la bolsa. */
@@ -131,6 +158,122 @@ export const confirmMockPayment = onCall(async (req) => {
     await cancelPendingOrder(orderId, "payment_rejected");
   }
   return { ok: true };
+});
+
+/** El cliente cancela su pedido: gratis si está pendiente de pago; con reembolso si falta tiempo para el retiro. */
+export const cancelOrder = onCall({ secrets: PAYMENT_SECRETS }, async (req) => {
+  const uid = requireUid(req.auth?.uid);
+  const orderId = String(req.data?.orderId ?? "");
+  const db = getFirestore();
+  const ref = db.collection("orders").doc(orderId);
+  const order = (await ref.get()).data();
+  if (!order || order.userUid !== uid) throw new HttpsError("not-found", "Pedido no encontrado.");
+
+  if (order.status === "pending_payment") {
+    await cancelPendingOrder(orderId, "customer");
+    return { refunded: false };
+  }
+  if (order.status !== "paid") throw new HttpsError("failed-precondition", "Este pedido ya no se puede cancelar.");
+  const limit = order.pickupStart.toMillis() - CANCEL_HOURS_BEFORE * 3600_000;
+  if (Date.now() > limit) {
+    throw new HttpsError("failed-precondition",
+      `Solo puedes cancelar hasta ${CANCEL_HOURS_BEFORE} horas antes del inicio del retiro.`);
+  }
+  await db.runTransaction(async (tx) => {
+    const fresh = (await tx.get(ref)).data();
+    if (fresh?.status !== "paid") throw new HttpsError("aborted", "Este pedido ya no se puede cancelar.");
+    tx.update(ref, {
+      status: "cancelled", cancelReason: "customer", cancelledAt: FieldValue.serverTimestamp(),
+      refund: { status: "pending", amount: fresh.amount },
+    });
+    tx.update(db.collection("bags").doc(fresh.bagId), { quantityAvailable: FieldValue.increment(1) });
+  });
+  await refundOrder(orderId);
+  return { refunded: true };
+});
+
+/** El comercio cancela la bolsa del día: se despublica, se reembolsa a quienes pagaron y se les avisa. */
+export const cancelBag = onCall({ secrets: PAYMENT_SECRETS }, async (req) => {
+  const uid = requireUid(req.auth?.uid);
+  const bagId = String(req.data?.bagId ?? "");
+  const reason = String(req.data?.reason ?? "").trim().slice(0, 200) || "El local tuvo un imprevisto.";
+  const db = getFirestore();
+  const bagRef = db.collection("bags").doc(bagId);
+  const bag = (await bagRef.get()).data();
+  if (!bag) throw new HttpsError("not-found", "Bolsa no encontrada.");
+  const store = (await db.collection("stores").doc(bag.storeId).get()).data();
+  if (store?.ownerUid !== uid || store?.status !== "approved") throw new HttpsError("permission-denied", "No es tu bolsa.");
+
+  await bagRef.update({ active: false, quantityAvailable: 0, cancelledAt: FieldValue.serverTimestamp(), cancelReason: reason });
+  const orders = await db.collection("orders").where("bagId", "==", bagId)
+    .where("status", "in", ["pending_payment", "paid"]).get();
+  let refunded = 0;
+  for (const d of orders.docs) {
+    const o = d.data();
+    const wasPaid = o.status === "paid";
+    await d.ref.update({
+      status: "cancelled", cancelReason: "store", storeMessage: reason, cancelledAt: FieldValue.serverTimestamp(),
+      ...(wasPaid ? { refund: { status: "pending", amount: o.amount } } : {}),
+    });
+    if (wasPaid) {
+      await refundOrder(d.id);
+      refunded++;
+      await pushToUser(o.userUid, `${o.storeName} canceló tu bolsa`,
+        `${reason} Te devolvimos $${Number(o.amount).toLocaleString("es-CL")}.`, `/order/${d.id}`);
+    }
+  }
+  return { cancelledOrders: orders.size, refunded };
+});
+
+/**
+ * Webhook de Mercado Pago: confirma o rechaza pagos. Verifica la firma y luego consulta el pago a la API
+ * (nunca confía en el contenido del aviso). Es idempotente: Mercado Pago reintenta los avisos.
+ */
+export const mercadoPagoWebhook = onRequest({ secrets: PAYMENT_SECRETS }, async (req, res) => {
+  const type = String(req.query.type ?? req.body?.type ?? req.query.topic ?? "");
+  const dataId = String(req.query["data.id"] ?? req.body?.data?.id ?? req.query.id ?? "");
+  if (type !== "payment" || !dataId) {
+    res.status(200).send("ignorado");
+    return;
+  }
+  if (!validMercadoPagoSignature(req.get("x-signature"), req.get("x-request-id"), dataId)) {
+    // Diagnóstico sin secretos: qué formato de notificación llegó y con qué encabezados.
+    logger.warn("Webhook de Mercado Pago con firma inválida", {
+      dataId,
+      query: Object.keys(req.query),
+      bodyType: req.body?.type ?? null,
+      bodyAction: req.body?.action ?? null,
+      hasSignature: Boolean(req.get("x-signature")),
+      hasRequestId: Boolean(req.get("x-request-id")),
+      signatureKeys: (req.get("x-signature") ?? "").split(",").map((p) => p.trim().split("=")[0]),
+    });
+    res.status(401).send("firma inválida");
+    return;
+  }
+  let payment;
+  try {
+    payment = await mercadoPago().getPayment(dataId);
+  } catch (e) {
+    // P. ej. la "Simular notificación" del panel de MP manda un pago inexistente (id 123456).
+    logger.warn("Pago de Mercado Pago no encontrado", { dataId, error: String(e) });
+    res.status(200).send("pago no encontrado");
+    return;
+  }
+  const orderId = payment.external_reference;
+  if (!orderId) {
+    res.status(200).send("sin referencia");
+    return;
+  }
+  if (payment.status === "approved") {
+    const result = await markOrderPaid(orderId, String(payment.id));
+    if (result === "late") {
+      await getFirestore().collection("orders").doc(orderId).update({ refund: { status: "pending", amount: payment.transaction_amount } });
+      await refundOrder(orderId);
+    }
+  } else if (["rejected", "cancelled"].includes(payment.status)) {
+    await cancelPendingOrder(orderId, "payment_rejected");
+  }
+  res.status(200).send("ok");
 });
 
 /** El comercio valida el código (o QR) que muestra el cliente al retirar. */

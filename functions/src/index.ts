@@ -5,7 +5,11 @@ initializeApp();
 // Santiago: misma región que Firestore para menor latencia.
 setGlobalOptions({ region: "southamerica-west1", maxInstances: 10 });
 
-export { confirmMockPayment, createOrder, expirePendingOrders, redeemOrder } from "./orders.js";
+export {
+  cancelBag, cancelOrder, confirmMockPayment, createOrder, expirePendingOrders, mercadoPagoWebhook, redeemOrder,
+} from "./orders.js";
+export { rateOrder } from "./reviews.js";
+export { createPayout } from "./payouts.js";
 export { joinWaitlist } from "./waitlist.js";
 export { onWaitlistCreated, sendTestEmail } from "./email.js";
 export { onBagTemplateWritten, publishRecurringBags } from "./recurring.js";

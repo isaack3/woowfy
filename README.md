@@ -36,12 +36,16 @@ lib/
     auth/        ingreso / registro (correo y Google), recuperar contraseña
     orders/      checkout simulado, comprobante con QR, "Mis pedidos"
     account/     cuenta: nombre, tu impacto, notificaciones, instalar app, legales
-    merchant/    panel del comercio: perfil, bolsas (y recurrentes), validar retiro con QR
+    merchant/    panel del comercio: perfil, bolsas (y recurrentes), cancelar bolsa, validar retiro con QR,
+                 ventas y pagos
     admin/       solicitudes, comercios, ventas, interesados, usuarios, correo
 assets/brand/    isotipo usado en la app
 functions/src/
-  orders.ts          createOrder, confirmMockPayment, redeemOrder, expirePendingOrders
-  payments.ts        interfaz PaymentProvider (mock | mercadopago)
+  orders.ts          createOrder, confirmMockPayment, redeemOrder, expirePendingOrders,
+                     cancelOrder (cliente), cancelBag (comercio), mercadoPagoWebhook
+  payments.ts        PaymentProvider: mock | mercadopago (Checkout Pro, reembolsos, firma del webhook)
+  reviews.ts         rateOrder: calificación de pedidos retirados y nota del local
+  payouts.ts         createPayout: liquidación de ventas al comercio (admin)
   waitlist.ts        joinWaitlist (formulario "Avísame" de la landing)
   email.ts           onWaitlistCreated (bienvenida vía Resend) y sendTestEmail
   recurring.ts       bolsas recurrentes: onBagTemplateWritten + publishRecurringBags (05:00 Chile)
@@ -78,13 +82,16 @@ El primer admin se asignó a mano; los siguientes se dan desde **Admin → Usuar
 | `stores/{id}` | local: categoría, logo, descripción, horario, dirección, `lat/lng`; `status`: `pending` → `approved` / `rejected` / `suspended` | el dueño crea y edita su perfil; admin cambia el estado |
 | `bags/{id}` | bolsa del día: precio, stock, horario, foto, categoría, logo y coordenadas del local | comercio aprobado (o la función de recurrentes); admin puede pausar |
 | `bagTemplates/{id}` | bolsa recurrente: días de la semana, horario `HH:mm`, precio, cantidad | comercio aprobado |
-| `orders/{id}` | compra: estado, monto, precio original, comisión, código de retiro | **solo Cloud Functions** |
+| `orders/{id}` | compra: estado, monto, precio original, comisión, código de retiro, cancelación y reembolso, calificación, liquidación | **solo Cloud Functions** |
+| `reviews/{orderId}` | calificación (1–5) y comentario de un pedido retirado | **solo la función** `rateOrder`; lectura pública |
+| `payouts/{id}` | pago de Woowfy a un comercio: pedidos, ventas, comisión, monto y nota | **solo la función** `createPayout`; lo ve el admin y el comercio |
 | `waitlist/{hash}` | inscritos de la landing: nombre, correo, tipo, región, comuna, estado del correo | **solo funciones**; lee el admin |
 | `config/email` | remitente de los correos | solo admin (Admin → Correo) |
 
 Estados de un pedido: `pending_payment` (bolsa reservada 15 min) → `paid` (muestra QR) →
-`picked_up` (el comercio validó el código). Si no se paga a tiempo o se rechaza: `cancelled` y el
-stock vuelve a la bolsa.
+`picked_up` (el comercio validó el código). `cancelled` si no se paga a tiempo, se rechaza el pago, el cliente
+cancela (hasta 2 h antes del retiro, con reembolso) o el comercio cancela la bolsa (reembolso y aviso).
+La nota de un local solo la escribe el servidor: las reglas impiden que el comercio la modifique.
 
 ## Rutas de la app
 
@@ -100,6 +107,7 @@ Las rutas van en inglés; los textos de la interfaz, en español de Chile.
 | `/order/:id` | Comprobante con QR |
 | `/mock-checkout/:id` | Pago simulado |
 | `/merchant` | Panel del comercio |
+| `/merchant/sales` | Ventas y pagos del comercio |
 | `/admin` | Panel admin |
 
 Landing: `/`, `/terms`, `/privacy`, y `/api/waitlist` (rewrite hacia la función `joinWaitlist`).
@@ -126,7 +134,8 @@ flutter run -d chrome --dart-define=USE_EMULATORS=true
 - Las tareas programadas (vencer reservas, recurrentes, recordatorios) no se ejecutan en el emulador.
 - El emulador de **Storage** falla con Java 25 (advertencia de `sun.misc.Unsafe`): sin él, el seed deja la
   bolsa de ejemplo sin foto. Las reglas de Storage se prueban con la Rules API (`projects.test`).
-- Para probar correos en el emulador, crea `functions/.secret.local` con `RESEND_API_KEY=...` (ignorado por git).
+- Para las funciones con secretos, crea `functions/.secret.local` (ignorado por git) con valores de prueba:
+  `RESEND_API_KEY=...`, `MP_ACCESS_TOKEN=TEST-...`, `MP_WEBHOOK_SECRET=...`.
 - Si al iniciar dice que los puertos 4000/8080/9099 están ocupados, quedó un emulador anterior abierto.
 
 Calidad:
@@ -221,11 +230,24 @@ de lista de espera, el registro, el alta de comercios y la pantalla Cuenta.
 - El isotipo del kit venía descentrado y cortado por la derecha: en `brand/fixed/` están las versiones
   corregidas (las que usan landing, app y `assets/brand/`).
 
-## Pagos
+## Pagos (Mercado Pago)
 
-`functions/.env` → `PAYMENTS_PROVIDER=mock`: el checkout es simulado y no mueve dinero. Para Mercado Pago
-ver ROADMAP (Fase 2). Los tokens van en Secret Manager (`firebase functions:secrets:set`), **nunca** en
-archivos del repositorio.
+`functions/.env` → `PAYMENTS_PROVIDER=mock` (hoy): checkout simulado, no mueve dinero.
+Con `PAYMENTS_PROVIDER=mercadopago` se usa **Checkout Pro**:
+
+1. En [Mercado Pago Developers](https://www.mercadopago.cl/developers) → *Tus integraciones* → crear aplicación
+   (Checkout Pro). Para probar, usa las **credenciales de prueba** (el Access Token empieza con `TEST-`) y
+   **usuarios de prueba** para pagar; no se mueve dinero real.
+2. En la aplicación → *Webhooks* → URL `https://southamerica-west1-woowfy-app.cloudfunctions.net/mercadoPagoWebhook`,
+   evento **Pagos**. Copia la **clave secreta** que muestra.
+3. Guarda ambos en Secret Manager (hoy tienen un valor provisional):
+   `firebase functions:secrets:set MP_ACCESS_TOKEN` y `firebase functions:secrets:set MP_WEBHOOK_SECRET`.
+4. Cambia `PAYMENTS_PROVIDER=mercadopago` en `functions/.env` y despliega: `firebase deploy --only functions`.
+
+El webhook verifica la firma (`x-signature`) y consulta el pago a la API antes de marcar el pedido como pagado.
+Si un pago llega después de vencida la reserva, se reembolsa solo. Las cancelaciones con pago devuelven el
+dinero con la API de reembolsos. Para cobrar de verdad se usan las credenciales de producción de la cuenta de
+la SpA. Los tokens van en Secret Manager, **nunca** en archivos del repositorio.
 
 ## Móviles (más adelante)
 

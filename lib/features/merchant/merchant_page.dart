@@ -1,3 +1,4 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -252,6 +253,16 @@ class _Dashboard extends StatelessWidget {
               _ProfileCard(store: store),
               const SizedBox(height: 16),
               _ToPickUp(storeId: store.id),
+              const SizedBox(height: 12),
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.payments_outlined, color: WoowfyColors.green),
+                  title: const Text('Ventas y pagos'),
+                  subtitle: const Text('Lo vendido, lo que Woowfy te pagó y opiniones'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.go('/merchant/sales'),
+                ),
+              ),
               const SizedBox(height: 24),
               _Templates(storeId: store.id),
               const SizedBox(height: 24),
@@ -260,8 +271,8 @@ class _Dashboard extends StatelessWidget {
               if (bags.isEmpty) const Text('Aún no publicas bolsas. Parte con la de hoy.'),
               for (final bag in bags)
                 Card(
-                  child: SwitchListTile(
-                    secondary: ClipRRect(
+                  child: ListTile(
+                    leading: ClipRRect(
                       borderRadius: BorderRadius.circular(10),
                       child: SizedBox(width: 52, height: 52, child: BagImage(url: bag.imageUrl, iconSize: 20)),
                     ),
@@ -271,8 +282,17 @@ class _Dashboard extends StatelessWidget {
                       '${formatPickupWindow(bag.pickupStart, bag.pickupEnd)} · '
                       'Quedan ${bag.quantityAvailable}',
                     ),
-                    value: bag.active,
-                    onChanged: (v) => Repository.instance.setBagActive(bag.id, v),
+                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Switch(value: bag.active, onChanged: (v) => Repository.instance.setBagActive(bag.id, v)),
+                      if (bag.pickupEnd.isAfter(DateTime.now()))
+                        PopupMenuButton<String>(
+                          tooltip: 'Más opciones',
+                          onSelected: (_) => _cancelBag(context, bag),
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(value: 'cancel', child: Text('Cancelar la bolsa de hoy')),
+                          ],
+                        ),
+                    ]),
                   ),
                 ),
             ],
@@ -446,5 +466,44 @@ class _Templates extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+/// Cancelar la bolsa del día: se despublica, se reembolsa y se avisa a quienes la compraron.
+Future<void> _cancelBag(BuildContext context, Bag bag) async {
+  final reason = TextEditingController();
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Cancelar la bolsa de hoy'),
+      content: SizedBox(
+        width: 400,
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Se dejará de ofrecer. A quienes ya la pagaron les devolveremos el dinero y les avisaremos.'),
+          const SizedBox(height: 12),
+          TextField(
+            controller: reason,
+            maxLength: 200,
+            decoration: const InputDecoration(labelText: 'Motivo para los clientes', hintText: 'Cerramos antes por un imprevisto.'),
+          ),
+        ]),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Volver')),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Cancelar bolsa')),
+      ],
+    ),
+  );
+  final text = reason.text.trim();
+  reason.dispose();
+  if (ok != true || !context.mounted) return;
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    final n = await Repository.instance.cancelBag(bag.id, text);
+    messenger.showSnackBar(SnackBar(
+      content: Text(n == 0 ? 'Bolsa cancelada. Nadie la había comprado.' : 'Bolsa cancelada. Reembolsamos y avisamos a $n ${n == 1 ? 'cliente' : 'clientes'}.'),
+    ));
+  } on FirebaseFunctionsException catch (e) {
+    messenger.showSnackBar(SnackBar(content: Text(e.message ?? 'No se pudo cancelar.')));
   }
 }

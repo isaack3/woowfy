@@ -11,6 +11,7 @@ import '../../core/theme.dart';
 import '../../data/models.dart';
 import '../../data/repository.dart';
 import 'bag_image.dart';
+import 'stars.dart';
 
 class BagDetailPage extends StatelessWidget {
   const BagDetailPage({super.key, required this.bagId});
@@ -132,7 +133,10 @@ class _Detail extends StatelessWidget {
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(bag.storeName, style: t.headlineSmall),
-                  if (bag.category != null) Text(bag.category!, style: t.bodySmall?.copyWith(color: WoowfyColors.muted)),
+                  Row(children: [
+                    if (bag.category != null) Text('${bag.category!}  ', style: t.bodySmall?.copyWith(color: WoowfyColors.muted)),
+                    RatingBadge(avg: bag.storeRatingAvg, count: bag.storeRatingCount),
+                  ]),
                 ]),
               ),
             ]),
@@ -185,6 +189,10 @@ class _Detail extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             _ReserveButton(bag: bag),
+            if (bag.storeRatingCount > 0) ...[
+              const SizedBox(height: 24),
+              _Reviews(storeId: bag.storeId),
+            ],
             const SizedBox(height: 12),
             Text(
               'El contenido varía según lo que quede en el día. Consulta alérgenos directamente en el local.',
@@ -235,6 +243,52 @@ class _ReserveButtonState extends State<_ReserveButton> {
       style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
       onPressed: soldOut || _busy ? null : _reserve,
       child: Text(soldOut ? 'Agotada' : (_busy ? 'Reservando…' : 'Reservar y pagar')),
+    );
+  }
+}
+
+/// Últimas opiniones del local.
+class _Reviews extends StatelessWidget {
+  const _Reviews({required this.storeId});
+
+  final String storeId;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return StreamBuilder<List<Review>>(
+      stream: Repository.instance.watchStoreReviews(storeId, limit: 5),
+      builder: (context, snap) {
+        final reviews = snap.data ?? const <Review>[];
+        if (reviews.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Opiniones', style: t.titleMedium),
+            const SizedBox(height: 8),
+            for (final r in reviews)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
+                          Stars(value: r.rating.toDouble(), size: 16),
+                          const SizedBox(width: 8),
+                          Text(r.userName, style: t.labelLarge),
+                        ]),
+                        if (r.comment.isNotEmpty) ...[const SizedBox(height: 4), Text(r.comment)],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

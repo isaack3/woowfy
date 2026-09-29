@@ -25,6 +25,9 @@ Future<void> main() async {
     functions.useFunctionsEmulator('localhost', 5001);
     await FirebaseStorage.instance.useStorageEmulator('localhost', 9199);
   }
+  // Espera a que Firebase restaure la sesión guardada: si no, al abrir directo una ruta protegida
+  // (p. ej. /merchant) el router vería "sin sesión" y mandaría al login.
+  await FirebaseAuth.instance.authStateChanges().first;
   Push.listenInForeground();
   runApp(const WoowfyApp());
 }

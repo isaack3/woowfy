@@ -96,6 +96,7 @@ class _Kpis extends StatelessWidget {
     final cancelled = orders.where((o) => o.status == OrderStatus.cancelled).length;
 
     return Wrap(
+      alignment: WrapAlignment.center,
       spacing: 12,
       runSpacing: 12,
       children: [

@@ -86,7 +86,9 @@ class _OrderTile extends StatelessWidget {
                   ],
                 ),
               ),
-              OrderStatusPill(o.status),
+              o.status == OrderStatus.pickedUp && o.rating == null
+                  ? const _RatePill()
+                  : OrderStatusPill(o.status),
             ],
           ),
         ),
@@ -133,6 +135,23 @@ class _Empty extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _RatePill extends StatelessWidget {
+  const _RatePill();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: const ShapeDecoration(color: WoowfyColors.orangeSoft, shape: StadiumBorder()),
+      child: const Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.star_rounded, size: 14, color: WoowfyColors.orange),
+        SizedBox(width: 4),
+        Text('Califica', style: TextStyle(color: Color(0xFF7A3510), fontWeight: FontWeight.w800, fontSize: 12)),
+      ]),
     );
   }
 }

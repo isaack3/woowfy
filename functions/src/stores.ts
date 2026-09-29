@@ -3,7 +3,7 @@ import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/fire
 import { geocode } from "./geo.js";
 
 /** Datos del local que se copian a sus bolsas (para mostrarlos sin leer el local). */
-const COPIED = ["name", "logoUrl", "category", "address", "comuna", "region", "lat", "lng"] as const;
+const COPIED = ["name", "logoUrl", "category", "address", "comuna", "region", "lat", "lng", "ratingAvg", "ratingCount"] as const;
 const BAG_FIELD: Record<(typeof COPIED)[number], string> = {
   name: "storeName",
   logoUrl: "storeLogoUrl",
@@ -13,6 +13,8 @@ const BAG_FIELD: Record<(typeof COPIED)[number], string> = {
   region: "region",
   lat: "lat",
   lng: "lng",
+  ratingAvg: "storeRatingAvg",
+  ratingCount: "storeRatingCount",
 };
 
 const addressChanged = (a: FirebaseFirestore.DocumentData, b: FirebaseFirestore.DocumentData) =>
