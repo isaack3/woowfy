@@ -136,7 +136,8 @@ y desplegada el 28-09; datos de producción migrados
 - [x] Datos bancarios del local en "Ventas y pagos" (privados: solo el dueño y el admin)
 
 **Etapa C — Piloto**
-- [ ] Correos de confirmación de compra y de reembolso (salen cuando Resend esté activo)
+- [x] Correos de compra (con código de retiro) y de reembolso (con motivo): función `onOrderUpdated`, interruptor
+      en Admin → Correo y pruebas de cada tipo. Salen solos cuando actives Resend (vista previa: `node tool/preview-emails.mjs`)
 - [x] Analítica básica propia y anónima (sin cookies): contadores por día en `stats/` + pestaña Admin → Analítica
       con visitas, inscritos, cuentas nuevas y embudo visita → bolsa vista → reserva → pago → retiro
 - [x] Landing con modo lanzamiento: interruptor en Admin → Interesados (`config/site`), sin redesplegar

@@ -227,9 +227,9 @@ class Repository {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-  /// Envía el correo de bienvenida de prueba al admin conectado. Devuelve el destinatario.
-  Future<String> sendTestEmail() async {
-    final res = await functions.httpsCallable('sendTestEmail').call<Map<String, dynamic>>();
+  /// Envía un correo de ejemplo al admin conectado: [kind] = welcome | purchase | refund. Devuelve el destinatario.
+  Future<String> sendTestEmail([String kind = 'welcome']) async {
+    final res = await functions.httpsCallable('sendTestEmail').call<Map<String, dynamic>>({'kind': kind});
     return res.data['to'] as String;
   }
 

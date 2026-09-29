@@ -307,12 +307,17 @@ class BagOrder {
 class EmailSettings {
   const EmailSettings({
     this.enabled = false,
+    this.orderEmails = true,
     this.fromName = 'Woowfy',
     this.fromEmail = 'hola@woowfy.com',
     this.replyTo,
   });
 
+  /// Interruptor general (requiere Resend configurado).
   final bool enabled;
+
+  /// Correos de compra y reembolso a los clientes.
+  final bool orderEmails;
   final String fromName;
   final String fromEmail;
   final String? replyTo;
@@ -322,6 +327,7 @@ class EmailSettings {
     if (d == null) return def;
     return EmailSettings(
       enabled: d['enabled'] as bool? ?? def.enabled,
+      orderEmails: d['orderEmails'] as bool? ?? def.orderEmails,
       fromName: d['fromName'] as String? ?? def.fromName,
       fromEmail: d['fromEmail'] as String? ?? def.fromEmail,
       replyTo: d['replyTo'] as String?,
@@ -330,6 +336,7 @@ class EmailSettings {
 
   Map<String, dynamic> toMap() => {
         'enabled': enabled,
+        'orderEmails': orderEmails,
         'fromName': fromName,
         'fromEmail': fromEmail,
         'replyTo': replyTo,

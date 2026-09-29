@@ -44,6 +44,7 @@ class _FormState extends State<_Form> {
   late final _fromEmail = TextEditingController(text: widget.initial.fromEmail);
   late final _replyTo = TextEditingController(text: widget.initial.replyTo ?? '');
   late bool _enabled = widget.initial.enabled;
+  late bool _orderEmails = widget.initial.orderEmails;
   bool _saving = false;
   bool _testing = false;
 
@@ -62,6 +63,7 @@ class _FormState extends State<_Form> {
     try {
       await Repository.instance.saveEmailSettings(EmailSettings(
         enabled: _enabled,
+        orderEmails: _orderEmails,
         fromName: _fromName.text.trim(),
         fromEmail: _fromEmail.text.trim().toLowerCase(),
         replyTo: _replyTo.text.trim().isEmpty ? null : _replyTo.text.trim().toLowerCase(),
@@ -74,11 +76,11 @@ class _FormState extends State<_Form> {
     }
   }
 
-  Future<void> _sendTest() async {
+  Future<void> _sendTest(String kind) async {
     setState(() => _testing = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final to = await Repository.instance.sendTestEmail();
+      final to = await Repository.instance.sendTestEmail(kind);
       messenger.showSnackBar(SnackBar(content: Text('Correo de prueba enviado a $to')));
     } on FirebaseFunctionsException catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('Falló el envío: ${e.message ?? e.code}')));
@@ -103,14 +105,21 @@ class _FormState extends State<_Form> {
         children: [
           Text('Correos automáticos', style: t.titleLarge),
           const SizedBox(height: 4),
-          const Text('Se usan para la bienvenida a la lista de espera (y más adelante, confirmaciones de pedidos).'),
+          const Text('Bienvenida a la lista de espera, confirmación de compra con el código de retiro y aviso de reembolso.'),
           const SizedBox(height: 16),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Enviar correo de bienvenida al inscribirse'),
-            subtitle: const Text('Si está apagado, las inscripciones se guardan igual, sin correo.'),
+            title: const Text('Enviar correos automáticos'),
+            subtitle: const Text('Enciéndelo cuando Resend esté configurado. Apagado, todo funciona igual pero sin correos.'),
             value: _enabled,
             onChanged: (v) => setState(() => _enabled = v),
+          ),
+          SwitchListTile(
+            contentPadding: const EdgeInsets.only(left: 16),
+            title: const Text('Compra y reembolso'),
+            subtitle: const Text('Al pagar: código de retiro y horario. Al reembolsar: monto y motivo.'),
+            value: _orderEmails,
+            onChanged: _enabled ? (v) => setState(() => _orderEmails = v) : null,
           ),
           const SizedBox(height: 16),
           TextFormField(
@@ -154,15 +163,27 @@ class _FormState extends State<_Form> {
             children: [
               FilledButton(onPressed: _saving ? null : _save, child: Text(_saving ? 'Guardando…' : 'Guardar')),
               const SizedBox(width: 12),
-              OutlinedButton.icon(
-                onPressed: _testing ? null : _sendTest,
-                icon: const Icon(Icons.send_outlined, size: 18),
-                label: Text(_testing ? 'Enviando…' : 'Enviar prueba a mi correo'),
+              PopupMenuButton<String>(
+                enabled: !_testing,
+                tooltip: 'Enviar un correo de ejemplo a tu correo',
+                onSelected: _sendTest,
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 'welcome', child: Text('Bienvenida a la lista de espera')),
+                  PopupMenuItem(value: 'purchase', child: Text('Confirmación de compra')),
+                  PopupMenuItem(value: 'refund', child: Text('Aviso de reembolso')),
+                ],
+                child: IgnorePointer(
+                  child: OutlinedButton.icon(
+                    onPressed: _testing ? null : () {},
+                    icon: const Icon(Icons.send_outlined, size: 18),
+                    label: Text(_testing ? 'Enviando…' : 'Enviar prueba a mi correo'),
+                  ),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          Text('La prueba usa la configuración guardada.', style: t.bodySmall),
+          Text('La prueba usa la configuración guardada y datos de ejemplo.', style: t.bodySmall),
         ],
       ),
     );
