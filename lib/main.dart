@@ -7,6 +7,7 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'app.dart';
+import 'core/analytics.dart';
 import 'core/backend.dart';
 import 'core/push.dart';
 import 'firebase_options.dart';
@@ -29,5 +30,6 @@ Future<void> main() async {
   // (p. ej. /merchant) el router vería "sin sesión" y mandaría al login.
   await FirebaseAuth.instance.authStateChanges().first;
   Push.listenInForeground();
+  Analytics.trackOncePerSession('app_visit');
   runApp(const WoowfyApp());
 }

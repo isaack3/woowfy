@@ -85,6 +85,7 @@ El primer admin se asignó a mano; los siguientes se dan desde **Admin → Usuar
 | `orders/{id}` | compra: estado, monto, precio original, comisión, código de retiro, cancelación y reembolso, calificación, liquidación | **solo Cloud Functions** |
 | `orders/{id}/private/pickup` | código de retiro del pedido | **solo Cloud Functions**; lo lee solo el cliente |
 | `stores/{id}/private/bank` | cuenta bancaria del local para liquidaciones | dueño y admin |
+| `stats/{yyyy-mm-dd}` | contadores anónimos de visitas por día (analítica) | **solo la función** `trackEvent`; lo lee el admin |
 | `config/site` | modo de la landing (`launched`): en construcción o lanzada | lectura pública; lo cambia el admin |
 | `pickupCodes/{storeId}_{código}` | índice de códigos vigentes para validar retiros | **solo Cloud Functions**; sin acceso desde la app |
 | `reviews/{orderId}` | calificación (1–5) y comentario de un pedido retirado | **solo la función** `rateOrder`; lectura pública |

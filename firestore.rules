@@ -109,6 +109,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Contadores anónimos por día (analítica propia): los escribe la función trackEvent, solo el admin los lee.
+    match /stats/{day} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // Lista de espera de la landing: la escribe la función joinWaitlist, solo el admin la lee.
     match /waitlist/{id} {
       allow read: if isAdmin();

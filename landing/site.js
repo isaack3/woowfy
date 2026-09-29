@@ -18,3 +18,23 @@
     })
     .catch(() => { /* sin conexión o sin documento: se mantiene el último modo */ });
 })();
+
+// Analítica anónima: solo suma contadores por día (sin cookies ni datos personales). Ver functions/src/analytics.ts.
+(function () {
+  if (['localhost', '127.0.0.1'].includes(location.hostname)) return;
+  const track = (e) => {
+    try { navigator.sendBeacon('/api/track', JSON.stringify({ e })); } catch (err) { /* ignorar */ }
+  };
+  try {
+    if (!sessionStorage.getItem('woowfy.visit')) {
+      sessionStorage.setItem('woowfy.visit', '1');
+      track('landing_visit');
+    }
+  } catch (err) { /* sin almacenamiento: no contamos la visita */ }
+  track(location.pathname.startsWith('/merchants') ? 'guide_view' : 'landing_view');
+  // Clics que llevan a la app (solo tienen efecto con la landing lanzada).
+  document.addEventListener('click', (ev) => {
+    const a = ev.target.closest && ev.target.closest('a[href^="https://app.woowfy.com"]');
+    if (a) track('cta_app');
+  });
+})();

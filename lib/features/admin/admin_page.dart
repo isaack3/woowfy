@@ -6,6 +6,7 @@ import '../../core/theme.dart';
 import '../../data/models.dart';
 import '../../data/repository.dart';
 import 'email_settings_tab.dart';
+import 'analytics_tab.dart';
 import 'sales_tab.dart';
 import 'stores_tabs.dart';
 import 'users_tab.dart';
@@ -50,7 +51,7 @@ class _AdminShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 6,
+      length: 7,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Woowfy · Admin'),
@@ -75,6 +76,7 @@ class _AdminShell extends StatelessWidget {
               ),
               const Tab(text: 'Comercios'),
               const Tab(text: 'Ventas'),
+              const Tab(text: 'Analítica'),
               const Tab(text: 'Interesados'),
               const Tab(text: 'Usuarios'),
               const Tab(text: 'Correo'),
@@ -97,6 +99,11 @@ class _AdminShell extends StatelessWidget {
               icon: Icons.insights_outlined,
               info: 'Resumen de pedidos de toda la plataforma: bolsas vendidas, ventas totales y la comisión de Woowfy en el periodo elegido.',
               child: SalesTab(),
+            ),
+            _Section(
+              icon: Icons.query_stats,
+              info: 'Visitas a woowfy.com y a la app, y el camino hasta la compra: cuántos ven una bolsa, reservan, pagan y retiran. Anónima: sin cookies ni datos personales.',
+              child: AnalyticsTab(),
             ),
             _Section(
               icon: Icons.mark_email_unread_outlined,

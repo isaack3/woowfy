@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../core/analytics.dart';
 import '../../core/checkout.dart';
 import '../../core/format.dart';
 import '../../core/theme.dart';
@@ -20,38 +21,46 @@ class BagDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<Bag?>(
-      stream: Repository.instance.watchBag(bagId),
-      builder: (context, snap) {
-        final bag = snap.data;
-        return Scaffold(
-          appBar: AppBar(
-            title: const WoowfyLogo(onDark: true),
-            leading: BackButton(onPressed: () => context.canPop() ? context.pop() : context.go('/')),
-            actions: [
-              if (bag != null) ...[
-                _FavoriteButton(bag: bag),
-                IconButton(tooltip: 'Compartir', icon: const Icon(Icons.share_outlined), onPressed: () => _share(context, bag)),
+    return TrackView(
+      event: 'bag_view',
+      child: StreamBuilder<Bag?>(
+        stream: Repository.instance.watchBag(bagId),
+        builder: (context, snap) {
+          final bag = snap.data;
+          return Scaffold(
+            appBar: AppBar(
+              title: const WoowfyLogo(onDark: true),
+              leading: BackButton(onPressed: () => context.canPop() ? context.pop() : context.go('/')),
+              actions: [
+                if (bag != null) ...[
+                  _FavoriteButton(bag: bag),
+                  IconButton(
+                    tooltip: 'Compartir',
+                    icon: const Icon(Icons.share_outlined),
+                    onPressed: () => _share(context, bag),
+                  ),
+                ],
+                const SizedBox(width: 4),
               ],
-              const SizedBox(width: 4),
-            ],
-          ),
-          body: snap.hasError
-              ? const Center(child: Text('Esta bolsa ya no está disponible.'))
-              : snap.connectionState == ConnectionState.waiting
-                  ? const Center(child: CircularProgressIndicator())
-                  : bag == null
-                      ? const Center(child: Text('Bolsa no encontrada.'))
-                      : _Detail(bag: bag),
-        );
-      },
+            ),
+            body: snap.hasError
+                ? const Center(child: Text('Esta bolsa ya no está disponible.'))
+                : snap.connectionState == ConnectionState.waiting
+                ? const Center(child: CircularProgressIndicator())
+                : bag == null
+                ? const Center(child: Text('Bolsa no encontrada.'))
+                : _Detail(bag: bag),
+          );
+        },
+      ),
     );
   }
 
   /// Comparte el enlace de la bolsa (WhatsApp, etc. con el menú nativo; si no existe, copia el enlace).
   Future<void> _share(BuildContext context, Bag bag) async {
     final url = 'https://app.woowfy.com/bag/${bag.id}';
-    final text = '${bag.storeName} tiene una bolsa sorpresa a ${formatClp(bag.price)} '
+    final text =
+        '${bag.storeName} tiene una bolsa sorpresa a ${formatClp(bag.price)} '
         '(normalmente ${formatClp(bag.originalPrice)}). Rescátala en Woowfy: $url';
     final messenger = ScaffoldMessenger.of(context);
     try {
@@ -90,11 +99,15 @@ class _FavoriteButton extends StatelessWidget {
           onPressed: () async {
             await Repository.instance.setFavorite(uid, storeId: bag.storeId, storeName: bag.storeName, favorite: !fav);
             if (!context.mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text(fav
-                  ? 'Dejaste de seguir a ${bag.storeName}'
-                  : 'Sigues a ${bag.storeName}. Activa las notificaciones en Cuenta para saber cuando publique.'),
-            ));
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  fav
+                      ? 'Dejaste de seguir a ${bag.storeName}'
+                      : 'Sigues a ${bag.storeName}. Activa las notificaciones en Cuenta para saber cuando publique.',
+                ),
+              ),
+            );
           },
         );
       },
@@ -120,35 +133,50 @@ class _Detail extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
               child: AspectRatio(
                 aspectRatio: 16 / 9,
-                child: Stack(fit: StackFit.expand, children: [
-                  BagImage(url: bag.imageUrl, iconSize: 56),
-                  Positioned(top: 12, left: 12, child: DiscountPill(bag.discountPercent)),
-                ]),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    BagImage(url: bag.imageUrl, iconSize: 56),
+                    Positioned(top: 12, left: 12, child: DiscountPill(bag.discountPercent)),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 16),
-            Row(children: [
-              StoreLogo(url: bag.storeLogoUrl, size: 44),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(bag.storeName, style: t.headlineSmall),
-                  Row(children: [
-                    if (bag.category != null) Text('${bag.category!}  ', style: t.bodySmall?.copyWith(color: WoowfyColors.muted)),
-                    RatingBadge(avg: bag.storeRatingAvg, count: bag.storeRatingCount),
-                  ]),
-                ]),
-              ),
-            ]),
+            Row(
+              children: [
+                StoreLogo(url: bag.storeLogoUrl, size: 44),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(bag.storeName, style: t.headlineSmall),
+                      Row(
+                        children: [
+                          if (bag.category != null)
+                            Text('${bag.category!}  ', style: t.bodySmall?.copyWith(color: WoowfyColors.muted)),
+                          RatingBadge(avg: bag.storeRatingAvg, count: bag.storeRatingCount),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 2),
-            Row(children: [
-              const Icon(Icons.place_outlined, size: 16, color: WoowfyColors.muted),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text([bag.address, bag.comuna, bag.region].where((s) => s.isNotEmpty).join(', '),
-                    style: t.bodyMedium?.copyWith(color: WoowfyColors.muted)),
-              ),
-            ]),
+            Row(
+              children: [
+                const Icon(Icons.place_outlined, size: 16, color: WoowfyColors.muted),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    [bag.address, bag.comuna, bag.region].where((s) => s.isNotEmpty).join(', '),
+                    style: t.bodyMedium?.copyWith(color: WoowfyColors.muted),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 16),
             Card(
               child: Padding(
@@ -160,16 +188,27 @@ class _Detail extends StatelessWidget {
                     const SizedBox(height: 6),
                     Text(bag.description.isEmpty ? 'Una sorpresa con lo que el local no vendió hoy.' : bag.description),
                     const Divider(height: 28),
-                    Row(children: [
-                      const Icon(Icons.schedule, color: WoowfyColors.green),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('Retiro hoy ${formatPickupWindow(bag.pickupStart, bag.pickupEnd)}', style: t.titleMedium),
-                          Text('Muestra tu código QR en el local', style: t.bodySmall?.copyWith(color: WoowfyColors.muted)),
-                        ]),
-                      ),
-                    ]),
+                    Row(
+                      children: [
+                        const Icon(Icons.schedule, color: WoowfyColors.green),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Retiro hoy ${formatPickupWindow(bag.pickupStart, bag.pickupEnd)}',
+                                style: t.titleMedium,
+                              ),
+                              Text(
+                                'Muestra tu código QR en el local',
+                                style: t.bodySmall?.copyWith(color: WoowfyColors.muted),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 16),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -177,8 +216,13 @@ class _Detail extends StatelessWidget {
                       children: [
                         Text(formatClp(bag.price), style: t.headlineMedium?.copyWith(color: WoowfyColors.green)),
                         const SizedBox(width: 10),
-                        Text(formatClp(bag.originalPrice),
-                            style: t.titleMedium?.copyWith(decoration: TextDecoration.lineThrough, color: WoowfyColors.muted)),
+                        Text(
+                          formatClp(bag.originalPrice),
+                          style: t.titleMedium?.copyWith(
+                            decoration: TextDecoration.lineThrough,
+                            color: WoowfyColors.muted,
+                          ),
+                        ),
                         const Spacer(),
                         if (!bag.soldOut) Text('Quedan ${bag.quantityAvailable}', style: t.labelLarge),
                       ],
@@ -194,10 +238,7 @@ class _Detail extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             _ReserveButton(bag: bag),
-            if (bag.storeRatingCount > 0) ...[
-              const SizedBox(height: 24),
-              _Reviews(storeId: bag.storeId),
-            ],
+            if (bag.storeRatingCount > 0) ...[const SizedBox(height: 24), _Reviews(storeId: bag.storeId)],
             const SizedBox(height: 12),
             Text(
               'El contenido varía según lo que quede en el día. Consulta alérgenos directamente en el local.',
@@ -229,6 +270,7 @@ class _ReserveButtonState extends State<_ReserveButton> {
       return;
     }
     setState(() => _busy = true);
+    Analytics.track('checkout_start');
     try {
       final order = await Repository.instance.createOrder(widget.bag.id);
       if (mounted) await openCheckout(context, order.checkoutUrl);
@@ -280,11 +322,13 @@ class _Reviews extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(children: [
-                          Stars(value: r.rating.toDouble(), size: 16),
-                          const SizedBox(width: 8),
-                          Text(r.userName, style: t.labelLarge),
-                        ]),
+                        Row(
+                          children: [
+                            Stars(value: r.rating.toDouble(), size: 16),
+                            const SizedBox(width: 8),
+                            Text(r.userName, style: t.labelLarge),
+                          ],
+                        ),
                         if (r.comment.isNotEmpty) ...[const SizedBox(height: 4), Text(r.comment)],
                       ],
                     ),

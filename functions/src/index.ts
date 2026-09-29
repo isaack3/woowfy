@@ -10,6 +10,7 @@ export {
 } from "./orders.js";
 export { rateOrder } from "./reviews.js";
 export { createAllPayouts, createPayout } from "./payouts.js";
+export { trackEvent } from "./analytics.js";
 export { joinWaitlist } from "./waitlist.js";
 export { onWaitlistCreated, sendTestEmail } from "./email.js";
 export { onBagTemplateWritten, publishRecurringBags } from "./recurring.js";

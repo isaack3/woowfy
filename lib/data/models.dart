@@ -593,3 +593,22 @@ class BankAccount {
         'email': email,
       };
 }
+
+/// Contadores anónimos de un día (stats/{yyyy-mm-dd}, los escribe la función trackEvent).
+class DayStats {
+  const DayStats({required this.day, required this.events});
+
+  /// "2026-09-29" (hora de Chile).
+  final String day;
+  final Map<String, int> events;
+
+  int operator [](String event) => events[event] ?? 0;
+
+  factory DayStats.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final raw = (doc.data()?['events'] as Map<String, dynamic>?) ?? const {};
+    return DayStats(
+      day: doc.id,
+      events: {for (final e in raw.entries) e.key: (e.value as num).toInt()},
+    );
+  }
+}

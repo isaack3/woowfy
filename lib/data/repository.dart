@@ -240,6 +240,27 @@ class Repository {
       .snapshots()
       .map((s) => s.docs.map(WaitlistEntry.fromDoc).toList());
 
+  /// Admin: contadores de visitas por día desde [since].
+  Stream<List<DayStats>> watchStatsSince(DateTime since) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    final from = '${since.year}-${two(since.month)}-${two(since.day)}';
+    return _db
+        .collection('stats')
+        .where(FieldPath.documentId, isGreaterThanOrEqualTo: from)
+        .snapshots()
+        .map((s) => s.docs.map(DayStats.fromDoc).toList()..sort((a, b) => a.day.compareTo(b.day)));
+  }
+
+  /// Admin: cuántos documentos de [collection] se crearon desde [since] (lista de espera, cuentas).
+  Future<int> countCreatedSince(String collection, DateTime since) async {
+    final agg = await _db
+        .collection(collection)
+        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(since))
+        .count()
+        .get();
+    return agg.count ?? 0;
+  }
+
   /// Todos los pedidos creados desde [since] (para las métricas del panel admin).
   Stream<List<BagOrder>> watchOrdersSince(DateTime since) => _db
       .collection('orders')

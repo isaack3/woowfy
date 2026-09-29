@@ -137,7 +137,8 @@ y desplegada el 28-09; datos de producción migrados
 
 **Etapa C — Piloto**
 - [ ] Correos de confirmación de compra y de reembolso (salen cuando Resend esté activo)
-- [ ] Analítica básica (visitas, inscritos, reservas y pagos)
+- [x] Analítica básica propia y anónima (sin cookies): contadores por día en `stats/` + pestaña Admin → Analítica
+      con visitas, inscritos, cuentas nuevas y embudo visita → bolsa vista → reserva → pago → retiro
 - [x] Landing con modo lanzamiento: interruptor en Admin → Interesados (`config/site`), sin redesplegar
 - [ ] Correo de lanzamiento a la lista de espera (cuando Resend esté activo)
 - [x] Guía para comercios en `woowfy.com/merchants` (calculadora, consejos, retiros, cancelaciones, pagos) y enlace
