@@ -64,13 +64,39 @@ class Repository {
       .snapshots()
       .map((s) => s.docs.map(BagOrder.fromDoc).toList());
 
-  /// Pedidos retirados que aún no se le pagan al comercio.
-  Stream<List<BagOrder>> watchUnpaidPickedUp(String storeId) => _db
+  /// Ventas cerradas (retiradas o no retiradas) que aún no se le pagan al comercio.
+  Stream<List<BagOrder>> watchUnpaidOrders(String storeId) => _db
       .collection('orders')
       .where('storeId', isEqualTo: storeId)
-      .where('status', isEqualTo: OrderStatus.pickedUp.value)
+      .where('status', whereIn: OrderStatus.payableValues)
       .snapshots()
       .map((s) => s.docs.map(BagOrder.fromDoc).where((o) => o.payoutId == null).toList());
+
+  /// Admin: ventas por liquidar de todos los locales.
+  Stream<List<BagOrder>> watchAllUnpaidOrders() => _db
+      .collection('orders')
+      .where('status', whereIn: OrderStatus.payableValues)
+      .snapshots()
+      .map((s) => s.docs.map(BagOrder.fromDoc).where((o) => o.payoutId == null).toList());
+
+  /// Admin: liquida a todos los locales con ventas pendientes. Devuelve lo registrado por local.
+  Future<List<Map<String, dynamic>>> createAllPayouts(String note) async {
+    final res = await functions.httpsCallable('createAllPayouts').call<Map<String, dynamic>>({'note': note});
+    return (res.data['payouts'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  DocumentReference<Map<String, dynamic>> _bankDoc(String storeId) => _stores.doc(storeId).collection('private').doc('bank');
+
+  Stream<BankAccount?> watchBankAccount(String storeId) =>
+      _bankDoc(storeId).snapshots().map((d) => d.exists ? BankAccount.fromMap(d.data()!) : null);
+
+  Future<BankAccount?> getBankAccount(String storeId) async {
+    final d = await _bankDoc(storeId).get();
+    return d.exists ? BankAccount.fromMap(d.data()!) : null;
+  }
+
+  Future<void> saveBankAccount(String storeId, BankAccount account) =>
+      _bankDoc(storeId).set({...account.toMap(), 'updatedAt': FieldValue.serverTimestamp()});
 
   Stream<List<Payout>> watchPayouts(String storeId) => _db
       .collection('payouts')

@@ -1,5 +1,6 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/format.dart';
@@ -47,8 +48,9 @@ class _StoresTabState extends State<StoresTab> {
   Widget build(BuildContext context) {
     return Column(
       children: [
+        const _PayAllBar(),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: SegmentedButton<StoreStatus>(
             segments: [
               for (final s in [StoreStatus.approved, StoreStatus.suspended, StoreStatus.rejected])
@@ -159,6 +161,15 @@ class _StoreCard extends StatelessWidget {
                 if (store.phone != null) _Contact(icon: Icons.phone_outlined, text: store.phone!, style: muted),
               ],
             ),
+            if (store.status == StoreStatus.approved || store.status == StoreStatus.suspended)
+              StreamBuilder<BankAccount?>(
+                stream: Repository.instance.watchBankAccount(store.id),
+                builder: (context, snap) => _Contact(
+                  icon: Icons.account_balance_outlined,
+                  text: snap.data?.summary ?? 'Sin datos bancarios',
+                  style: muted,
+                ),
+              ),
             if (store.statusReason != null) ...[
               const SizedBox(height: 8),
               Text('Motivo: ${store.statusReason}', style: t.bodySmall),
@@ -292,7 +303,7 @@ class _PayoutDialogState extends State<_PayoutDialog> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<BagOrder>>(
-      stream: Repository.instance.watchUnpaidPickedUp(widget.store.id),
+      stream: Repository.instance.watchUnpaidOrders(widget.store.id),
       builder: (context, snap) {
         final orders = snap.data ?? const <BagOrder>[];
         final gross = orders.fold<int>(0, (s, o) => s + o.amount);
@@ -305,9 +316,10 @@ class _PayoutDialogState extends State<_PayoutDialog> {
                 ? const SizedBox(height: 80, child: Center(child: CircularProgressIndicator()))
                 : Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
                     if (orders.isEmpty)
-                      const Text('No tiene ventas retiradas pendientes de pago.')
+                      const Text('No tiene ventas pendientes de pago.')
                     else ...[
-                      Text('${orders.length} ${orders.length == 1 ? 'bolsa retirada' : 'bolsas retiradas'} sin liquidar'),
+                      Text('${orders.length} ${orders.length == 1 ? 'venta' : 'ventas'} sin liquidar'
+                          '${_noShows(orders) > 0 ? ' (${_noShows(orders)} no retiradas por el cliente)' : ''}'),
                       Text('Ventas ${formatClp(gross)} − comisión ${formatClp(gross - toPay)}'),
                       const SizedBox(height: 8),
                       Text('A pagar: ${formatClp(toPay)}', style: Theme.of(context).textTheme.titleLarge),
@@ -328,6 +340,180 @@ class _PayoutDialogState extends State<_PayoutDialog> {
           ],
         );
       },
+    );
+  }
+}
+
+int _noShows(List<BagOrder> orders) => orders.where((o) => o.status == OrderStatus.noShow).length;
+
+/// Resumen de lo que hay que pagar a todos los locales, con acceso a "Liquidar todos".
+class _PayAllBar extends StatelessWidget {
+  const _PayAllBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return StreamBuilder<List<BagOrder>>(
+      stream: Repository.instance.watchAllUnpaidOrders(),
+      builder: (context, snap) {
+        final orders = snap.data ?? const <BagOrder>[];
+        final stores = orders.map((o) => o.storeId).toSet().length;
+        final amount = orders.fold<int>(0, (s, o) => s + o.storeAmount);
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('Por pagar a los locales', style: t.bodySmall),
+                      Text(formatClp(amount), style: t.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                      Text(
+                        orders.isEmpty
+                            ? 'Todo liquidado.'
+                            : '${orders.length} ${orders.length == 1 ? 'venta' : 'ventas'} de $stores ${stores == 1 ? 'local' : 'locales'}',
+                        style: t.bodySmall,
+                      ),
+                    ]),
+                  ),
+                  FilledButton(
+                    onPressed: orders.isEmpty
+                        ? null
+                        : () => showDialog<void>(context: context, builder: (_) => _PayAllDialog(orders: orders)),
+                    child: const Text('Liquidar todos'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Liquida a todos los locales de una vez y entrega la planilla para transferir en lote desde el banco.
+class _PayAllDialog extends StatefulWidget {
+  const _PayAllDialog({required this.orders});
+
+  final List<BagOrder> orders;
+
+  @override
+  State<_PayAllDialog> createState() => _PayAllDialogState();
+}
+
+class _PayAllDialogState extends State<_PayAllDialog> {
+  final _note = TextEditingController();
+  bool _saving = false;
+
+  /// Planilla generada después de registrar (null mientras no se registra).
+  String? _csv;
+  List<Map<String, dynamic>> _done = const [];
+
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      final payouts = await Repository.instance.createAllPayouts(_note.text.trim());
+      String cell(Object? v) => '"${(v ?? '').toString().replaceAll('"', '""')}"';
+      final rows = ['local,titular,rut,banco,tipo_cuenta,numero_cuenta,correo,monto,ventas,liquidacion'];
+      for (final p in payouts) {
+        final bank = await Repository.instance.getBankAccount(p['storeId'] as String);
+        rows.add([
+          p['storeName'], bank?.holder, bank?.rut, bank?.bank, bank?.accountTypeLabel, bank?.accountNumber, bank?.email,
+          p['storeAmount'], p['orderCount'], p['payoutId'],
+        ].map(cell).join(','));
+      }
+      if (!mounted) return;
+      setState(() {
+        _done = payouts;
+        _csv = rows.join('\n');
+        _saving = false;
+      });
+    } on FirebaseFunctionsException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message ?? 'No se pudo registrar.')));
+      setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final byStore = <String, List<BagOrder>>{};
+    for (final o in widget.orders) {
+      byStore.putIfAbsent(o.storeName, () => []).add(o);
+    }
+    final total = widget.orders.fold<int>(0, (s, o) => s + o.storeAmount);
+
+    if (_csv != null) {
+      final paid = _done.fold<int>(0, (s, p) => s + (p['storeAmount'] as num).toInt());
+      return AlertDialog(
+        title: const Text('Liquidaciones registradas'),
+        content: SizedBox(
+          width: 460,
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('${_done.length} ${_done.length == 1 ? 'local' : 'locales'} por ${formatClp(paid)}.'),
+            const SizedBox(height: 8),
+            const Text('Copia la planilla (nombre, RUT, banco, cuenta y monto de cada local) y úsala para las '
+                'transferencias desde el banco. Los locales sin datos bancarios salen con esas columnas vacías.'),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar')),
+          FilledButton.icon(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: _csv!));
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Planilla copiada (CSV).')));
+              }
+            },
+            icon: const Icon(Icons.table_view_outlined, size: 18),
+            label: const Text('Copiar planilla'),
+          ),
+        ],
+      );
+    }
+
+    return AlertDialog(
+      title: const Text('Liquidar a todos los locales'),
+      content: SizedBox(
+        width: 460,
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          for (final e in byStore.entries)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(children: [
+                Expanded(
+                  child: Text('${e.key} · ${e.value.length} ${e.value.length == 1 ? 'venta' : 'ventas'}'
+                      '${_noShows(e.value) > 0 ? ' (${_noShows(e.value)} no retiradas)' : ''}'),
+                ),
+                Text(formatClp(e.value.fold<int>(0, (s, o) => s + o.storeAmount))),
+              ]),
+            ),
+          const Divider(),
+          Row(children: [
+            Expanded(child: Text('Total a transferir', style: t.titleMedium)),
+            Text(formatClp(total), style: t.titleLarge),
+          ]),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _note,
+            decoration: const InputDecoration(labelText: 'Nota (p. ej. transferencias semana 40)'),
+          ),
+        ]),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        FilledButton(onPressed: _saving ? null : _save, child: Text(_saving ? 'Registrando…' : 'Registrar liquidaciones')),
+      ],
     );
   }
 }

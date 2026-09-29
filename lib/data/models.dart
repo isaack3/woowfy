@@ -183,6 +183,8 @@ enum OrderStatus {
   pendingPayment('pending_payment', 'Esperando pago'),
   paid('paid', 'Listo para retirar'),
   pickedUp('picked_up', 'Retirado'),
+  /// Pagado y no retirado a tiempo: sin reembolso y se le paga igual al local.
+  noShow('no_show', 'No retirado'),
   cancelled('cancelled', 'Cancelado');
 
   const OrderStatus(this.value, this.label);
@@ -191,6 +193,14 @@ enum OrderStatus {
 
   static OrderStatus parse(String? v) =>
       values.firstWhere((s) => s.value == v, orElse: () => OrderStatus.cancelled);
+
+  /// Ventas que se le pagan al local (y cuentan como vendidas).
+  bool get isSold => this == paid || this == pickedUp || this == noShow;
+
+  /// Ventas cerradas que entran en la próxima liquidación.
+  bool get isPayable => this == pickedUp || this == noShow;
+
+  static List<String> get payableValues => [pickedUp.value, noShow.value];
 }
 
 /// Compra de una bolsa (colección `orders`). Solo la escriben las Cloud Functions.
@@ -198,6 +208,7 @@ class BagOrder {
   const BagOrder({
     required this.id,
     required this.bagId,
+    this.storeId = '',
     required this.storeName,
     required this.address,
     required this.comuna,
@@ -223,6 +234,7 @@ class BagOrder {
 
   final String id;
   final String bagId;
+  final String storeId;
   final String storeName;
   final String? imageUrl;
   /// Valor normal de la bolsa (pedidos creados desde el sprint 2).
@@ -258,6 +270,7 @@ class BagOrder {
     return BagOrder(
       id: doc.id,
       bagId: d['bagId'] as String,
+      storeId: d['storeId'] as String? ?? '',
       storeName: d['storeName'] as String? ?? '',
       address: d['address'] as String? ?? '',
       comuna: d['comuna'] as String? ?? '',
@@ -531,4 +544,52 @@ class Payout {
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
     );
   }
+}
+
+/// Cuenta bancaria del local para recibir liquidaciones (stores/{id}/private/bank: solo el dueño y el admin).
+class BankAccount {
+  const BankAccount({
+    required this.holder,
+    required this.rut,
+    required this.bank,
+    required this.accountType,
+    required this.accountNumber,
+    this.email = '',
+  });
+
+  final String holder;
+  final String rut;
+  final String bank;
+  /// corriente | vista | ahorro
+  final String accountType;
+  final String accountNumber;
+  final String email;
+
+  static const accountTypes = {'corriente': 'Cuenta corriente', 'vista': 'Cuenta vista / RUT', 'ahorro': 'Cuenta de ahorro'};
+
+  String get accountTypeLabel => accountTypes[accountType] ?? accountType;
+
+  /// "Banco Estado · Cuenta vista ····1234"
+  String get summary {
+    final n = accountNumber.length > 4 ? accountNumber.substring(accountNumber.length - 4) : accountNumber;
+    return '$bank · $accountTypeLabel ····$n';
+  }
+
+  factory BankAccount.fromMap(Map<String, dynamic> d) => BankAccount(
+        holder: d['holder'] as String? ?? '',
+        rut: d['rut'] as String? ?? '',
+        bank: d['bank'] as String? ?? '',
+        accountType: d['accountType'] as String? ?? 'vista',
+        accountNumber: d['accountNumber'] as String? ?? '',
+        email: d['email'] as String? ?? '',
+      );
+
+  Map<String, dynamic> toMap() => {
+        'holder': holder,
+        'rut': rut,
+        'bank': bank,
+        'accountType': accountType,
+        'accountNumber': accountNumber,
+        'email': email,
+      };
 }

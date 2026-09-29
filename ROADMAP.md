@@ -127,12 +127,13 @@ y desplegada el 28-09; datos de producción migrados
       usuario con sesión y sin ventana de antigüedad en la firma del webhook; bajo impacto)
 - [x] A11 · Arrepentimiento: cancelar con reembolso hasta 15 min después de pagar (además de las 2 h antes del retiro)
 
-**Etapa B — Operación de pagos**
+**Etapa B — Operación de pagos ✅**
 - [x] Red de seguridad de pagos (el pedido se concilia con Mercado Pago si el aviso no llega)
 - [x] Comisión visible siempre (25%): admin → Ventas, ventas del local, al publicar una bolsa y en el detalle para clientes
-- [ ] Decidir: ¿se le paga al local si el cliente no llega a retirar? (recomendado: sí, como Too Good To Go)
-- [ ] "Liquidar todos" + planilla (CSV) con monto y datos bancarios de cada local para transferir en lote
-- [ ] Datos bancarios del local en su perfil (privados: solo el dueño y el admin)
+- [x] Decidido: **sí se le paga al local si el cliente no retira**. Pasado el horario (+60 min) el pedido queda
+      "No retirado" (función `markNoShows`, cada 30 min), sin reembolso, y entra en la liquidación
+- [x] "Liquidar todos" (Admin → Comercios) + planilla CSV con titular, RUT, banco, cuenta y monto por local
+- [x] Datos bancarios del local en "Ventas y pagos" (privados: solo el dueño y el admin)
 
 **Etapa C — Piloto**
 - [ ] Correos de confirmación de compra y de reembolso (salen cuando Resend esté activo)

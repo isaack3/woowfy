@@ -84,6 +84,7 @@ El primer admin se asignó a mano; los siguientes se dan desde **Admin → Usuar
 | `bagTemplates/{id}` | bolsa recurrente: días de la semana, horario `HH:mm`, precio, cantidad | comercio aprobado |
 | `orders/{id}` | compra: estado, monto, precio original, comisión, código de retiro, cancelación y reembolso, calificación, liquidación | **solo Cloud Functions** |
 | `orders/{id}/private/pickup` | código de retiro del pedido | **solo Cloud Functions**; lo lee solo el cliente |
+| `stores/{id}/private/bank` | cuenta bancaria del local para liquidaciones | dueño y admin |
 | `pickupCodes/{storeId}_{código}` | índice de códigos vigentes para validar retiros | **solo Cloud Functions**; sin acceso desde la app |
 | `reviews/{orderId}` | calificación (1–5) y comentario de un pedido retirado | **solo la función** `rateOrder`; lectura pública |
 | `payouts/{id}` | pago de Woowfy a un comercio: pedidos, ventas, comisión, monto y nota | **solo la función** `createPayout`; lo ve el admin y el comercio |
@@ -91,7 +92,7 @@ El primer admin se asignó a mano; los siguientes se dan desde **Admin → Usuar
 | `config/email` | remitente de los correos | solo admin (Admin → Correo) |
 
 Estados de un pedido: `pending_payment` (bolsa reservada 15 min) → `paid` (muestra QR) →
-`picked_up` (el comercio validó el código). `cancelled` si no se paga a tiempo, se rechaza el pago, el cliente
+`picked_up` (el comercio validó el código) o `no_show` (no se retiró a tiempo: sin reembolso y se le paga igual al local). `cancelled` si no se paga a tiempo, se rechaza el pago, el cliente
 cancela (hasta 2 h antes del retiro, con reembolso) o el comercio cancela la bolsa (reembolso y aviso).
 La nota de un local solo la escribe el servidor: las reglas impiden que el comercio la modifique.
 

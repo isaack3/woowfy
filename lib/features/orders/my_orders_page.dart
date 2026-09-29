@@ -109,6 +109,7 @@ class OrderStatusPill extends StatelessWidget {
       OrderStatus.paid => (WoowfyColors.lime, WoowfyColors.green),
       OrderStatus.pendingPayment => (WoowfyColors.orangeSoft, const Color(0xFF7A3510)),
       OrderStatus.pickedUp => (const Color(0xFFEDEAE0), WoowfyColors.muted),
+      OrderStatus.noShow => (const Color(0xFFEDEAE0), WoowfyColors.muted),
       OrderStatus.cancelled => (const Color(0xFFFFE0D9), const Color(0xFFB83A22)),
     };
     return Container(

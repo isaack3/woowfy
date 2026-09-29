@@ -390,6 +390,27 @@ export const redeemOrder = onCall(async (req) => {
 });
 
 /**
+ * Pedidos pagados que no se retiraron a tiempo: pasan a "no_show". No hay reembolso (la comida se apartó para el
+ * cliente, ver /terms) y se le pagan igual al local en la próxima liquidación.
+ */
+export const markNoShows = onSchedule({
+  schedule: "every 30 minutes",
+  region: "southamerica-east1", // Cloud Scheduler no existe en Santiago
+  timeZone: "America/Santiago",
+}, async () => {
+  const db = getFirestore();
+  // Mismo margen que redeemOrder: pasado este punto ya no se puede validar el retiro.
+  const cutoff = Timestamp.fromMillis(Date.now() - REDEEM_GRACE_MINUTES * 60_000);
+  const late = await db.collection("orders")
+    .where("status", "==", "paid").where("pickupEnd", "<", cutoff).limit(450).get();
+  if (late.empty) return;
+  const batch = db.batch();
+  late.docs.forEach((d) => batch.update(d.ref, { status: "no_show", noShowAt: FieldValue.serverTimestamp() }));
+  await batch.commit();
+  logger.info("Pedidos no retirados", { count: late.size });
+});
+
+/**
  * Libera reservas cuyo pago no se completó a tiempo.
  * Corre en São Paulo porque Cloud Scheduler no está disponible en southamerica-west1 (Santiago).
  */

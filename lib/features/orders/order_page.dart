@@ -157,6 +157,32 @@ class _Body extends StatelessWidget {
                   ),
           ],
         );
+      case OrderStatus.noShow:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            header,
+            const Icon(Icons.schedule, size: 64, color: WoowfyColors.muted),
+            const SizedBox(height: 8),
+            Text(
+              'No retiraste esta bolsa a tiempo',
+              textAlign: TextAlign.center,
+              style: t.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'El horario de retiro era ${formatPickupWindow(order.pickupStart, order.pickupEnd)}. Como el local la apartó '
+              'para ti, no hay reembolso. Si tuviste un problema, escríbenos a hola@woowfy.com.',
+              textAlign: TextAlign.center,
+              style: t.bodyMedium?.copyWith(color: WoowfyColors.muted),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton(
+              onPressed: () => context.go('/'),
+              child: const Text('Ver otras bolsas'),
+            ),
+          ],
+        );
       case OrderStatus.cancelled:
         final (why, refundable) = switch (order.cancelReason) {
           'customer' => ('Cancelaste este pedido.', true),

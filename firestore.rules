@@ -59,6 +59,18 @@ service cloud.firestore {
           || (resource.data.status == 'rejected' && request.resource.data.status == 'pending')));
     }
 
+    // Datos privados del local (p. ej. cuenta bancaria para recibir liquidaciones): solo el dueño y el admin.
+    match /stores/{storeId}/private/{doc} {
+      function ownsStore() {
+        return signedIn() && get(/databases/$(database)/documents/stores/$(storeId)).data.ownerUid == request.auth.uid;
+      }
+      allow read: if ownsStore() || isAdmin();
+      allow write: if (ownsStore() || isAdmin()) && doc == 'bank'
+        && request.resource.data.keys().hasOnly(['holder', 'rut', 'bank', 'accountType', 'accountNumber', 'email', 'updatedAt'])
+        && request.resource.data.holder is string && request.resource.data.holder.size() <= 100
+        && request.resource.data.accountNumber is string && request.resource.data.accountNumber.size() <= 30;
+    }
+
     match /bags/{bagId} {
       allow read: if resource.data.active == true
         || ownsApprovedStore(resource.data.storeId)

@@ -99,3 +99,75 @@ Revisados: están bien planteados (no confían en datos del cliente y son idempo
 4. #1: requiere decisión de negocio con el usuario.
 
 Después de cambiar reglas o funciones: `npx tsc --noEmit` en `functions/`, `flutter analyze`, probar con emuladores (`npm --prefix functions run seed`) y desplegar (`firebase deploy --only firestore:rules,functions`).
+
+---
+
+# Segunda revisión (28-09-2026, noche)
+
+Se revisó el commit `d0df3a8` ("Sprint 3 y auditoría") contra los hallazgos #1–#9. **Todos están corregidos en el código** y los arreglos hacen lo que dicen:
+
+| # | Arreglo verificado |
+|---|---|
+| 1 | Código de retiro en `orders/{id}/private/pickup` (sólo lo lee el cliente); `redeemOrder` valida contra `pickupCodes/{storeId}_{código}` (sólo servidor). |
+| 2 | `ownerEmail` ya no se guarda en el local; el admin lo lee desde `users/{ownerUid}`. |
+| 3 | `allow create` de `stores` limita los campos con `keys().hasOnly([...])`. |
+| 4 | Precio validado en `allow update` de `bags` y otra vez en `createOrder`. |
+| 5 | `cancelBag` cancela cada pedido en una transacción que relee su estado; `pushToUser` va en `try/catch`. |
+| 6 | Máximo 2 reservas sin pagar por persona (`MAX_PENDING_ORDERS`). |
+| 7 | La verificación de monto está en `applyApprovedPayment`, compartida por el webhook y la conciliación. |
+| 8 | `createPayout` es una transacción. |
+| 9 | `createOrder` exige que el local siga `approved` dentro de la transacción. |
+
+`npx tsc --noEmit` y `flutter analyze` pasan.
+
+**Nada de lo siguiente se ha corregido todavía.** Antes de cambiar algo, confirmar con el usuario.
+
+## Pendientes o nuevos
+
+### 10. No se puede confirmar desde el código que los datos antiguos de producción se migraron
+- **Dónde:** `lib/features/orders/order_page.dart` (`_PickupCode`, que todavía usa `order.pickupCode` como respaldo), `functions/src/orders.ts` (`redeemOrder`), locales existentes en `stores/`.
+- **Problema:** el ROADMAP dice "datos de producción migrados", pero no hay un script de migración en el repo.
+  - Si los pedidos antiguos conservan `pickupCode` en el documento del pedido, el comercio todavía puede leer esos códigos.
+  - Si a esos pedidos no se les creó su entrada en `pickupCodes/`, `redeemOrder` ya no los puede validar.
+  - Lo mismo con `ownerEmail` en los locales creados antes del arreglo.
+- **Siguiente paso:** revisar producción en modo sólo lectura (contar documentos con esos campos, sin mostrar valores). Si quedan, borrar `pickupCode` de los pedidos y `ownerEmail` de los locales, crear las entradas de `pickupCodes/` que falten para pedidos `paid` vigentes y, después, quitar el respaldo `order.pickupCode` de la app.
+
+### 11. Un pago con monto menor se ignora sin avisar a nadie
+- **Dónde:** `functions/src/orders.ts`, `applyApprovedPayment`.
+- **Problema:** si `amount < order.amount`, devuelve `"noop"` y sólo deja un `logger.error`. El pedido sigue `pending_payment`, vence, `expirePendingOrders` lo cancela y ese dinero cobrado no se reembolsa ni queda marcado en ningún lado. Es un caso raro.
+- **Arreglo sugerido:** guardar en el pedido algo como `paymentIssue: { paymentId, amount, at }` para que el admin lo vea, o reembolsar automáticamente ese pago.
+
+### 12. El límite de 2 reservas se puede saltar con llamadas en paralelo
+- **Dónde:** `functions/src/orders.ts`, `createOrder`.
+- **Problema:** la cuenta de reservas sin pagar se hace fuera de la transacción, así que varias llamadas simultáneas pasan el control. Impacto bajo.
+- **Arreglo sugerido:** un contador por usuario (p. ej. `users/{uid}.pendingOrders`) leído y actualizado dentro de la transacción, o aceptarlo como está.
+
+### 13. El arrepentimiento de 15 minutos sirve aunque el retiro ya haya empezado
+- **Dónde:** `functions/src/orders.ts`, `cancelOrder` (`CANCEL_GRACE_MINUTES`).
+- **Problema:** si el local entrega la bolsa sin escanear el código, el pedido sigue `paid` y el cliente puede cancelar con reembolso y quedarse con la bolsa.
+- **Es una regla de negocio.** Opciones: insistirle a los locales que siempre escaneen (guía para comercios), o no aplicar la gracia cuando ya empezó el horario de retiro.
+
+### 14. La pantalla del código se queda cargando si falla la lectura
+- **Dónde:** `lib/features/orders/order_page.dart`, `_PickupCode`.
+- **Problema:** si `watchPickupCode` da error (permisos, red), `snap.data` es null y se muestra el spinner para siempre.
+- **Arreglo sugerido:** manejar `snap.hasError` con un mensaje y un botón para reintentar.
+
+### Menores
+- **`pickupCodes/` nunca se limpia:** crece sin límite. Se podría borrar la entrada al retirar, cancelar o vencer el pedido, o usar TTL de Firestore sobre un campo de fecha.
+- **El dueño puede editar `lat`/`lng` de su local:** `allow update` de `stores` no usa `hasOnly`, así que el comercio puede ubicarse en cualquier parte del mapa. Se podría agregar `lat`, `lng`, `reviewedAt` y `statusReason` a los campos protegidos (como `touchesRating`).
+- **Siguen aceptados:** subidas a Storage de cualquier usuario con sesión y la falta de ventana de antigüedad (`ts`) en la firma del webhook.
+
+## Trabajo en curso al momento de la revisión (preliminar)
+
+Había cambios sin commitear de otra sesión (Sprint 4, etapa B: no-shows, "liquidar todos", datos bancarios). Hay que revisarlos de nuevo cuando estén terminados; por ahora:
+
+- **`markNoShows`** (`functions/src/orders.ts`): actualiza en lote sin releer el estado. Si justo se valida un retiro al mismo tiempo, un pedido `picked_up` podría quedar como `no_show`. Los dos estados se le pagan al local, así que sólo afecta el registro. Arreglo: una transacción por pedido, o un `update` con precondición `lastUpdateTime`.
+- **Datos bancarios** (`firestore.rules`, `stores/{storeId}/private/{doc}`): con `allow write` y `request.resource` nulo al borrar, el dueño no puede borrar sus datos. Además sólo se valida el tipo de `holder` y `accountNumber`; `rut`, `bank`, `accountType` y `email` no se validan.
+- **`createAllPayouts`** (`functions/src/payouts.ts`): lee todos los pedidos pagables de la historia. Ya está anotado en el código como algo a mejorar con más volumen.
+
+## Orden sugerido
+
+1. #10 (verificar producción; es lo único que podría dejar abierto el hallazgo #1).
+2. #11 y #14.
+3. Revisar el trabajo en curso cuando se commitee.
+4. #12, #13 y los menores según prioridad del negocio.

@@ -98,7 +98,7 @@ class _Kpis extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sold = orders.where((o) => o.status == OrderStatus.paid || o.status == OrderStatus.pickedUp).toList();
+    final sold = orders.where((o) => o.status.isSold).toList();
     final pickedUp = sold.where((o) => o.status == OrderStatus.pickedUp).length;
     final gmv = sold.fold<int>(0, (s, o) => s + o.amount);
     final fees = sold.fold<int>(0, (s, o) => s + o.platformFee);
