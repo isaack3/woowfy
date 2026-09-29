@@ -30,10 +30,26 @@ class _QrScannerPageState extends State<QrScannerPage> {
   @override
   void initState() {
     super.initState();
-    // Si en 6 segundos la cámara no arrancó, mostramos ayuda en vez de dejar la pantalla negra.
+    _watchStart();
+  }
+
+  /// Si en 6 segundos la cámara no arrancó, mostramos ayuda en vez de dejar la pantalla negra.
+  void _watchStart() {
+    _timer?.cancel();
     _timer = Timer(const Duration(seconds: 6), () {
       if (mounted && !_controller.value.isRunning) setState(() => _slow = true);
     });
+  }
+
+  Future<void> _retry() async {
+    setState(() => _slow = false);
+    try {
+      await _controller.stop();
+      await _controller.start();
+    } catch (_) {
+      // El errorBuilder del escáner muestra el detalle.
+    }
+    _watchStart();
   }
 
   @override
@@ -98,9 +114,10 @@ class _QrScannerPageState extends State<QrScannerPage> {
           ValueListenableBuilder<MobileScannerState>(
             valueListenable: _controller,
             builder: (context, state, _) => (_slow && !state.isRunning && state.error == null)
-                ? const _Help(
+                ? _Help(
                     message: 'La cámara no está enviando imagen. Revisa que el navegador tenga permiso, que tu equipo '
                         'tenga cámara, o usa el botón de arriba para cambiar de cámara.',
+                    onRetry: _retry,
                   )
                 : const SizedBox.shrink(),
           ),
@@ -124,9 +141,10 @@ class _QrScannerPageState extends State<QrScannerPage> {
 
 /// Ayuda sobre el visor cuando la cámara no funciona, con salida a escribir el código.
 class _Help extends StatelessWidget {
-  const _Help({required this.message});
+  const _Help({required this.message, this.onRetry});
 
   final String message;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -142,6 +160,12 @@ class _Help extends StatelessWidget {
           Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 15)),
           const SizedBox(height: 20),
           FilledButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Escribir el código')),
+          if (onRetry != null)
+            TextButton(
+              onPressed: onRetry,
+              style: TextButton.styleFrom(foregroundColor: WoowfyColors.lime),
+              child: const Text('Reintentar'),
+            ),
         ],
       ),
     );

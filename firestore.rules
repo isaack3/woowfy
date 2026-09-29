@@ -104,7 +104,9 @@ service cloud.firestore {
 
     // Configuración de la plataforma (p. ej. config/email: remitente de los correos). Solo admin.
     match /config/{doc} {
-      allow read, write: if isAdmin();
+      // config/site (modo de la landing: en construcción o lanzada) es público; el resto, solo admin.
+      allow read: if doc == 'site' || isAdmin();
+      allow write: if isAdmin();
     }
 
     // Lista de espera de la landing: la escribe la función joinWaitlist, solo el admin la lee.

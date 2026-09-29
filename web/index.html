@@ -42,6 +42,20 @@
         },
       };
     })();
+
+    // Escáner QR en iPhone: Safari solo muestra el video de la cámara dentro de la página si el <video> tiene
+    // "playsinline" (y sin sonido). mobile_scanner no lo pone, y sin él el visor queda en negro.
+    (function () {
+      const play = HTMLMediaElement.prototype.play;
+      HTMLMediaElement.prototype.play = function () {
+        if (this instanceof HTMLVideoElement) {
+          this.playsInline = true;
+          this.setAttribute('playsinline', '');
+          this.muted = true;
+        }
+        return play.apply(this, arguments);
+      };
+    })();
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>

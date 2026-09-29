@@ -1,6 +1,7 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/format.dart';
@@ -262,6 +263,7 @@ class _Dashboard extends StatelessWidget {
                   onTap: () => context.go('/merchant/sales'),
                 ),
               ),
+              const _GuideCard(),
               const SizedBox(height: 24),
               _Templates(storeId: store.id),
               const SizedBox(height: 24),
@@ -504,5 +506,23 @@ Future<void> _cancelBag(BuildContext context, Bag bag) async {
     ));
   } on FirebaseFunctionsException catch (e) {
     messenger.showSnackBar(SnackBar(content: Text(e.message ?? 'No se pudo cancelar.')));
+  }
+}
+
+/// Enlace a la guía para comercios (woowfy.com/merchants): cómo publicar, entregar, cancelar y cobrar.
+class _GuideCard extends StatelessWidget {
+  const _GuideCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.menu_book_outlined, color: WoowfyColors.green),
+        title: const Text('Guía para comercios'),
+        subtitle: const Text('Consejos para publicar, entregar y cobrar'),
+        trailing: const Icon(Icons.open_in_new, size: 18),
+        onTap: () => launchUrl(Uri.parse('https://woowfy.com/merchants')),
+      ),
+    );
   }
 }

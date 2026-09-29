@@ -213,6 +213,15 @@ class Repository {
   Stream<EmailSettings> watchEmailSettings() =>
       _db.doc('config/email').snapshots().map((d) => EmailSettings.fromMap(d.data()));
 
+  /// Modo de la landing: false = "en construcción", true = lanzada (config/site, lectura pública).
+  Stream<bool> watchSiteLaunched() =>
+      _db.doc('config/site').snapshots().map((d) => d.data()?['launched'] == true);
+
+  Future<void> setSiteLaunched(bool launched) => _db.doc('config/site').set({
+        'launched': launched,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
   Future<void> saveEmailSettings(EmailSettings s) => _db.doc('config/email').set({
         ...s.toMap(),
         'updatedAt': FieldValue.serverTimestamp(),

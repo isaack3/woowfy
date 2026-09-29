@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/theme.dart';
 import '../../data/models.dart';
 import '../../data/repository.dart';
 
@@ -32,6 +33,8 @@ class _WaitlistTabState extends State<WaitlistTab> {
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            const _LaunchCard(),
+            const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -131,6 +134,62 @@ class _EmailBadge extends StatelessWidget {
         const SizedBox(width: 4),
         Text(label, style: TextStyle(fontSize: 11, color: color)),
       ]),
+    );
+  }
+}
+
+/// Interruptor del modo de la landing (woowfy.com): "en construcción" con lista de espera, o lanzada con acceso a la app.
+class _LaunchCard extends StatelessWidget {
+  const _LaunchCard();
+
+  Future<void> _toggle(BuildContext context, bool launched) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(launched ? 'Lanzar Woowfy' : 'Volver a "en construcción"'),
+        content: Text(launched
+            ? 'woowfy.com dejará de decir "en construcción" y llevará a las personas a la app para comprar y a los '
+                'locales a pedir su alta. Hazlo cuando tengas locales activos y pagos reales.'
+            : 'woowfy.com volverá a mostrar "en construcción" y la lista de espera.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(launched ? 'Lanzar' : 'Volver')),
+        ],
+      ),
+    );
+    if (ok == true) await Repository.instance.setSiteLaunched(launched);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return StreamBuilder<bool>(
+      stream: Repository.instance.watchSiteLaunched(),
+      builder: (context, snap) {
+        final launched = snap.data ?? false;
+        return Card(
+          color: launched ? WoowfyColors.limeSoft : WoowfyColors.orangeSoft,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+            child: Row(children: [
+              Icon(launched ? Icons.rocket_launch_outlined : Icons.construction_outlined, color: WoowfyColors.green),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(launched ? 'woowfy.com está lanzada' : 'woowfy.com está "en construcción"', style: t.titleSmall),
+                  Text(
+                    launched
+                        ? 'Los botones llevan a la app; la lista de espera queda para comunas sin locales.'
+                        : 'Los botones invitan a inscribirse en esta lista de espera.',
+                    style: t.bodySmall,
+                  ),
+                ]),
+              ),
+              Switch(value: launched, onChanged: snap.hasData ? (v) => _toggle(context, v) : null),
+            ]),
+          ),
+        );
+      },
     );
   }
 }

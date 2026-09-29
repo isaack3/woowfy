@@ -138,8 +138,10 @@ y desplegada el 28-09; datos de producción migrados
 **Etapa C — Piloto**
 - [ ] Correos de confirmación de compra y de reembolso (salen cuando Resend esté activo)
 - [ ] Analítica básica (visitas, inscritos, reservas y pagos)
-- [ ] Landing en modo lanzamiento + correo a la lista de espera
-- [ ] Guía breve para comercios (publicar bolsas y validar retiros)
+- [x] Landing con modo lanzamiento: interruptor en Admin → Interesados (`config/site`), sin redesplegar
+- [ ] Correo de lanzamiento a la lista de espera (cuando Resend esté activo)
+- [x] Guía para comercios en `woowfy.com/merchants` (calculadora, consejos, retiros, cancelaciones, pagos) y enlace
+      desde el panel del local
 
 **Etapa D — Pagos divididos con Mercado Pago Marketplace** (después de la SpA; ver sección "Pagos divididos")
 - [ ] Cada local conecta su cuenta de Mercado Pago; MP le deposita el 75% y a Woowfy el 25% en cada compra
@@ -172,6 +174,7 @@ y desplegada el 28-09; datos de producción migrados
 - [x] Mercado Pago de prueba configurado (app Woowfy, token, clave del webhook regenerada, simulación 200)
 - [x] Escáner QR en computador: usa la webcam, botón para cambiar de cámara y ayuda si no hay imagen
 - [x] Admin: explicación breve en cada pestaña y contenido centrado
+- [x] Escáner QR en iPhone: el video de la cámara necesita `playsinline` (arreglo en `web/index.html`) + botón Reintentar
 
 ## Fase 2 — Pagos reales y operación
 
