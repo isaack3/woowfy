@@ -15,7 +15,7 @@ export async function geocode(address: string, comuna: string, region: string): 
   for (const q of queries) {
     const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=cl&q=${encodeURIComponent(q)}`;
     try {
-      const res = await fetch(url, { headers: { "User-Agent": "Woowfy/1.0 (hola@woowfy.com)", "Accept-Language": "es" } });
+      const res = await fetch(url, { headers: { "User-Agent": "Woowfy/1.0 (hola@passva.com)", "Accept-Language": "es" } });
       if (!res.ok) continue;
       const [hit] = (await res.json()) as { lat: string; lon: string }[];
       if (hit) return { lat: Number(hit.lat), lng: Number(hit.lon) };

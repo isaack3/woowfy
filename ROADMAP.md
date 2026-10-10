@@ -200,7 +200,7 @@ Puntajes (heurísticas de Nielsen): Home 22/40 · flujo cliente 22/40 · comerci
 - [ ] ✉️ **Activar correos:** cuenta Resend + verificar `woowfy.com` (DNS en Piensa Solutions) +
       `firebase functions:secrets:set RESEND_API_KEY` + redeploy de las funciones de correo + activar en
       Admin → Correo (hoy el secreto tiene un valor provisional)
-- [ ] 📥 Reenvío `hola@woowfy.com` → Gmail con ImprovMX (MX `mx1/mx2.improvmx.com`, TXT SPF) y TXT `_dmarc`
+- [x] ~~Reenvío `hola@woowfy.com` con ImprovMX~~: ya no hace falta, el contacto es `hola@passva.com` (10-10). Queda opcional el TXT `_dmarc`
 - [ ] 🗺️ Revisar el mapa en la app y poner la dirección real de tu local (hoy ubicado en el centro de El Monte)
 - [ ] ⚖️ Revisión legal de `/terms` y `/privacy` (actualizados el 29-09 con todo lo nuevo) y completar datos de la
       SpA y los valores en amarillo (2 reservas, 25%, pago semanal)

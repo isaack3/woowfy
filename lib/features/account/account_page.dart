@@ -59,6 +59,13 @@ class AccountPage extends StatelessWidget {
                             ),
                           ],
                         ),
+                        Center(
+                          child: TextButton(
+                            onPressed: () => launchUrl(Uri.parse(passvaUrl)),
+                            style: TextButton.styleFrom(foregroundColor: WoowfyColors.muted),
+                            child: const Text('Un producto de Passva'),
+                          ),
+                        ),
                       ],
                     ),
                   ),

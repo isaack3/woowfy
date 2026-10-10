@@ -7,6 +7,9 @@ import 'theme.dart';
 const termsUrl = 'https://woowfy.com/terms';
 const privacyUrl = 'https://woowfy.com/privacy';
 
+/// Woowfy es un producto de Passva SpA.
+const passvaUrl = 'https://passva.com';
+
 /// "Al … aceptas los Términos y la Política de privacidad", con enlaces que abren en otra pestaña.
 class LegalNotice extends StatefulWidget {
   const LegalNotice({super.key, required this.prefix});

@@ -25,12 +25,14 @@ interface EmailSettings {
 }
 
 const DEFAULTS: EmailSettings = {
-  enabled: false, orderEmails: true, fromName: "Woowfy", fromEmail: "hola@woowfy.com", replyTo: null,
+  enabled: false, orderEmails: true, fromName: "Woowfy", fromEmail: "hola@woowfy.com", replyTo: "hola@passva.com",
 };
 
 async function emailSettings(): Promise<EmailSettings> {
   const snap = await getFirestore().doc("config/email").get();
-  return { ...DEFAULTS, ...(snap.data() as Partial<EmailSettings> | undefined) };
+  const s = { ...DEFAULTS, ...(snap.data() as Partial<EmailSettings> | undefined) };
+  // Las respuestas siempre llegan a un buzón real (woowfy.com solo envía, no recibe).
+  return { ...s, replyTo: s.replyTo || DEFAULTS.replyTo };
 }
 
 async function sendEmail(apiKey: string, s: EmailSettings, to: string, subject: string, html: string): Promise<string> {

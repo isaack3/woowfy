@@ -172,7 +172,7 @@ class _Body extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'El horario de retiro era ${formatPickupWindow(order.pickupStart, order.pickupEnd)}. Como el local la apartó '
-              'para ti, no hay reembolso. Si tuviste un problema, escríbenos a hola@woowfy.com.',
+              'para ti, no hay reembolso. Si tuviste un problema, escríbenos a hola@passva.com.',
               textAlign: TextAlign.center,
               style: t.bodyMedium?.copyWith(color: WoowfyColors.muted),
             ),
@@ -371,7 +371,7 @@ class _RefundStatus extends StatelessWidget {
       ),
       'error' => (
         Icons.error_outline,
-        'No pudimos procesar el reembolso automáticamente. Te contactaremos; escríbenos a hola@woowfy.com.',
+        'No pudimos procesar el reembolso automáticamente. Te contactaremos; escríbenos a hola@passva.com.',
         const Color(0xFFFFE0D9),
       ),
       _ => (

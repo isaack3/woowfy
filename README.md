@@ -261,7 +261,7 @@ Plantillas en `functions/src/email.ts` (HTML con la paleta de la marca):
 - La API key va en Secret Manager: `firebase functions:secrets:set RESEND_API_KEY` y luego
   `firebase deploy --only functions:onWaitlistCreated,functions:onOrderUpdated,functions:sendTestEmail`.
   Hoy tiene un valor provisional: con el interruptor apagado no se envía nada.
-- Correo entrante: `hola@woowfy.com` se reenviará a Gmail con ImprovMX (pendiente de configurar los MX).
+- Correo de contacto: `hola@passva.com` (Passva SpA, dueña de Woowfy). `hola@woowfy.com` solo envía (Resend) y las respuestas van a `hola@passva.com`.
 - "Recuperar contraseña" lo envía Firebase Auth (en español), no Resend.
 
 ## Páginas legales

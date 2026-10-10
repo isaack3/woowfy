@@ -91,7 +91,7 @@ class _StatusMessage extends StatelessWidget {
           ],
           if (store.status == StoreStatus.suspended) ...[
             const SizedBox(height: 16),
-            const Text('Escríbenos a hola@woowfy.com para más información.'),
+            const Text('Escríbenos a hola@passva.com para más información.'),
           ],
           // Atajo para quien es admin y dueño a la vez: la aprobación se hace en Admin → Solicitudes.
           if (store.status == StoreStatus.pending)

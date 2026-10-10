@@ -155,8 +155,8 @@ class _FormState extends State<_Form> {
             keyboardType: TextInputType.emailAddress,
             decoration: const InputDecoration(
               labelText: 'Responder a (opcional)',
-              hintText: 'tu correo personal',
-              helperText: 'Si alguien responde el correo, la respuesta llega aquí.',
+              hintText: 'hola@passva.com',
+              helperText: 'Si alguien responde el correo, la respuesta llega aquí. Vacío = hola@passva.com.',
             ),
             validator: (v) => email(v, optional: true),
           ),
