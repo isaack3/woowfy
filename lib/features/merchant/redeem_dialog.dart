@@ -1,6 +1,6 @@
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/errors.dart';
 import '../../core/web_qr.dart';
 import '../../data/repository.dart';
 import 'qr_scanner_page.dart';
@@ -49,8 +49,8 @@ class _RedeemDialogState extends State<RedeemDialog> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Entregado: $bagTitle')),
       );
-    } on FirebaseFunctionsException catch (e) {
-      setState(() => _error = e.message ?? e.code);
+    } catch (e) {
+      if (mounted) setState(() => _error = friendlyError(e, fallback: 'No pudimos validar el código. Intenta de nuevo.'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

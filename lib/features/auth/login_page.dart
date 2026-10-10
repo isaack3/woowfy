@@ -110,7 +110,7 @@ class _LoginPageState extends State<LoginPage> {
         'account-exists-with-different-credential' =>
           'Ese correo ya está registrado con contraseña. Ingresa con tu correo y contraseña.',
         'network-request-failed' => 'Sin conexión. Revisa tu internet.',
-        _ => 'No pudimos continuar ($code).',
+        _ => 'No pudimos continuar. Intenta de nuevo en un momento.',
       };
 
   @override

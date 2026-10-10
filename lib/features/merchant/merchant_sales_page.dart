@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/errors.dart';
 import '../../core/format.dart';
 import '../../core/theme.dart';
 import '../../data/models.dart';
@@ -124,7 +125,13 @@ class _SalesState extends State<_Sales> {
     return StreamBuilder<List<BagOrder>>(
       stream: _orders,
       builder: (context, snap) {
-        if (snap.hasError) return Text('No pudimos cargar las ventas: ${snap.error}');
+        if (snap.hasError) {
+          return ErrorRetry(
+            title: 'No pudimos cargar las ventas',
+            error: snap.error,
+            onRetry: () => setState(() => _orders = Repository.instance.watchStoreOrdersSince(widget.storeId, _period.since)),
+          );
+        }
         final orders = snap.data;
         final sold = (orders ?? const <BagOrder>[])
             .where((o) => o.status.isSold)

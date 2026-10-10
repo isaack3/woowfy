@@ -605,6 +605,8 @@
       businessInput.required = isStore;
     }
     form.addEventListener('change', e => { if (e.target.name === 'type') setType(e.target.value); });
+    // Desde la guía para comercios (/?type=merchant#waitlist) el formulario abre como "Tengo un local".
+    if (new URLSearchParams(location.search).get('type') === 'merchant') setType('comercio');
 
     // Los botones "Avísame" / "Tengo un local" preseleccionan el tipo y llevan el foco al correo.
     document.querySelectorAll('a[data-type]').forEach(a => a.addEventListener('click', () => {

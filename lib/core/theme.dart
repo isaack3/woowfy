@@ -88,19 +88,19 @@ class WoowfyTheme {
         iconTheme: WidgetStateProperty.resolveWith((s) => IconThemeData(
               color: s.contains(WidgetState.selected) ? WoowfyColors.green : WoowfyColors.cream,
             )),
-        labelTextStyle: WidgetStateProperty.resolveWith((s) => TextStyle(
+        labelTextStyle: WidgetStateProperty.resolveWith((s) => GoogleFonts.lato(
               color: s.contains(WidgetState.selected) ? WoowfyColors.lime : WoowfyColors.cream,
               fontWeight: FontWeight.w700,
               fontSize: 12,
             )),
       ),
-      navigationRailTheme: const NavigationRailThemeData(
+      navigationRailTheme: NavigationRailThemeData(
         backgroundColor: WoowfyColors.green,
         indicatorColor: WoowfyColors.lime,
-        selectedIconTheme: IconThemeData(color: WoowfyColors.green),
-        unselectedIconTheme: IconThemeData(color: WoowfyColors.cream),
-        selectedLabelTextStyle: TextStyle(color: WoowfyColors.lime, fontWeight: FontWeight.w700),
-        unselectedLabelTextStyle: TextStyle(color: WoowfyColors.cream),
+        selectedIconTheme: const IconThemeData(color: WoowfyColors.green),
+        unselectedIconTheme: const IconThemeData(color: WoowfyColors.cream),
+        selectedLabelTextStyle: GoogleFonts.lato(color: WoowfyColors.lime, fontWeight: FontWeight.w700),
+        unselectedLabelTextStyle: GoogleFonts.lato(color: WoowfyColors.cream),
       ),
       cardTheme: const CardThemeData(
         color: Colors.white,
@@ -116,7 +116,7 @@ class WoowfyTheme {
           disabledBackgroundColor: WoowfyColors.line,
           shape: pill,
           padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
-          textStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+          textStyle: GoogleFonts.lato(fontWeight: FontWeight.w900, fontSize: 15),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -125,11 +125,11 @@ class WoowfyTheme {
           side: const BorderSide(color: WoowfyColors.green, width: 1.4),
           shape: pill,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          textStyle: const TextStyle(fontWeight: FontWeight.w700),
+          textStyle: GoogleFonts.lato(fontWeight: FontWeight.w700),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(foregroundColor: WoowfyColors.green, textStyle: const TextStyle(fontWeight: FontWeight.w700)),
+        style: TextButton.styleFrom(foregroundColor: WoowfyColors.green, textStyle: GoogleFonts.lato(fontWeight: FontWeight.w700)),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: WoowfyColors.lime,
@@ -145,9 +145,9 @@ class WoowfyTheme {
           side: const BorderSide(color: WoowfyColors.line),
         ),
       ),
-      chipTheme: const ChipThemeData(
+      chipTheme: ChipThemeData(
         backgroundColor: WoowfyColors.limeSoft,
-        labelStyle: TextStyle(color: WoowfyColors.green, fontWeight: FontWeight.w700),
+        labelStyle: GoogleFonts.lato(color: WoowfyColors.green, fontWeight: FontWeight.w700),
         side: BorderSide.none,
         shape: StadiumBorder(),
       ),
@@ -168,9 +168,9 @@ class WoowfyTheme {
         thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? WoowfyColors.green : null),
         trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? WoowfyColors.lime : null),
       ),
-      snackBarTheme: const SnackBarThemeData(
+      snackBarTheme: SnackBarThemeData(
         backgroundColor: WoowfyColors.green,
-        contentTextStyle: TextStyle(color: WoowfyColors.cream),
+        contentTextStyle: GoogleFonts.lato(color: WoowfyColors.cream),
         behavior: SnackBarBehavior.floating,
       ),
       dialogTheme: const DialogThemeData(backgroundColor: WoowfyColors.cream),
@@ -219,7 +219,7 @@ class DiscountPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: const ShapeDecoration(color: WoowfyColors.lime, shape: StadiumBorder()),
-      child: Text('-$percent%', style: const TextStyle(color: WoowfyColors.green, fontWeight: FontWeight.w900, fontSize: 12)),
+      child: Text('-$percent%', style: GoogleFonts.lato(color: WoowfyColors.green, fontWeight: FontWeight.w900, fontSize: 12)),
     );
   }
 }

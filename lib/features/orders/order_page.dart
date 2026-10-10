@@ -55,7 +55,7 @@ class _Body extends StatelessWidget {
     final t = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
     final pickup =
-        'Retiro ${formatPickupWindow(order.pickupStart, order.pickupEnd)}';
+        'Retiro ${formatPickup(order.pickupStart, order.pickupEnd, withDate: true)}';
 
     final header = Column(
       crossAxisAlignment: CrossAxisAlignment.start,

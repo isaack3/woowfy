@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/errors.dart';
 import '../../core/theme.dart';
 import '../../data/models.dart';
 import '../../data/repository.dart';
@@ -21,10 +22,10 @@ class _WaitlistTabState extends State<WaitlistTab> {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<WaitlistEntry>>(
+    return Reloadable(builder: (context) => StreamBuilder<List<WaitlistEntry>>(
       stream: Repository.instance.watchWaitlist(),
       builder: (context, snap) {
-        if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
+        if (snap.hasError) return ErrorRetry(title: 'No pudimos cargar los interesados', error: snap.error);
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         final all = snap.data!;
         final merchants = all.where((e) => e.isMerchant).length;
@@ -87,7 +88,7 @@ class _WaitlistTabState extends State<WaitlistTab> {
           ],
         );
       },
-    );
+    ));
   }
 
   Future<void> _copyCsv(BuildContext context, List<WaitlistEntry> entries) async {
@@ -157,7 +158,18 @@ class _LaunchCard extends StatelessWidget {
         ],
       ),
     );
-    if (ok == true) await Repository.instance.setSiteLaunched(launched);
+    if (ok != true || !context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await Repository.instance.setSiteLaunched(launched);
+      messenger.showSnackBar(SnackBar(
+        content: Text(launched ? 'woowfy.com ya está lanzada.' : 'woowfy.com volvió a "en construcción".'),
+      ));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(
+        content: Text(friendlyError(e, fallback: 'No se pudo cambiar el modo de woowfy.com. Intenta de nuevo.')),
+      ));
+    }
   }
 
   @override

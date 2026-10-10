@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/errors.dart';
 import '../../core/format.dart';
 import '../../core/theme.dart';
 import '../../data/models.dart';
@@ -17,7 +18,7 @@ class MyOrdersPage extends StatelessWidget {
     final uid = FirebaseAuth.instance.currentUser!.uid;
     return Scaffold(
       appBar: AppBar(title: const WoowfyLogo(onDark: true)),
-      body: StreamBuilder<List<BagOrder>>(
+      body: Reloadable(builder: (context) => StreamBuilder<List<BagOrder>>(
         stream: Repository.instance.watchMyOrders(uid),
         builder: (context, snap) {
           final orders = snap.data;
@@ -31,7 +32,7 @@ class MyOrdersPage extends StatelessWidget {
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: snap.hasError
-                        ? Text('No pudimos cargar tus pedidos: ${snap.error}')
+                        ? ErrorRetry(title: 'No pudimos cargar tus pedidos', error: snap.error)
                         : orders == null
                             ? const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()))
                             : orders.isEmpty
@@ -46,7 +47,7 @@ class MyOrdersPage extends StatelessWidget {
             ],
           );
         },
-      ),
+      )),
     );
   }
 }
@@ -80,7 +81,7 @@ class _OrderTile extends StatelessWidget {
                     Text(o.bagTitle, style: t.bodySmall?.copyWith(color: WoowfyColors.muted)),
                     const SizedBox(height: 2),
                     Text(
-                      '${o.pickupStart.day}/${o.pickupStart.month} · ${formatPickupWindow(o.pickupStart, o.pickupEnd)} · ${formatClp(o.amount)}',
+                      '${formatPickup(o.pickupStart, o.pickupEnd)} · ${formatClp(o.amount)}',
                       style: t.bodySmall?.copyWith(color: WoowfyColors.muted),
                     ),
                   ],

@@ -61,3 +61,4 @@ serviceAccountKey*.json
 
 # Herramientas locales (Claude Code)
 .claude/
+.impeccable/live/

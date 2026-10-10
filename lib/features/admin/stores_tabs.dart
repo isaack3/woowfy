@@ -1,9 +1,10 @@
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/errors.dart';
 import '../../core/format.dart';
+import '../../core/theme.dart';
 import '../../data/models.dart';
 import '../../data/repository.dart';
 
@@ -100,10 +101,10 @@ class _StoreList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<Store>>(
+    return Reloadable(builder: (context) => StreamBuilder<List<Store>>(
       stream: Repository.instance.watchStoresByStatus(status),
       builder: (context, snap) {
-        if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
+        if (snap.hasError) return ErrorRetry(title: 'No pudimos cargar los comercios', error: snap.error);
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         final stores = snap.data!;
         if (stores.isEmpty) return Center(child: Text(empty));
@@ -119,7 +120,7 @@ class _StoreList extends StatelessWidget {
           ),
         );
       },
-    );
+    ));
   }
 }
 
@@ -220,7 +221,7 @@ Future<void> _changeStatus(BuildContext context, Store store, StoreStatus status
     await Repository.instance.setStoreStatus(store.id, status, reason: reason);
     messenger.showSnackBar(SnackBar(content: Text('${store.name}: ${status.label.toLowerCase()}')));
   } catch (e) {
-    messenger.showSnackBar(SnackBar(content: Text('No se pudo actualizar: $e')));
+    messenger.showSnackBar(SnackBar(content: Text(friendlyError(e, fallback: 'No se pudo actualizar. Intenta de nuevo.'))));
   }
 }
 
@@ -294,52 +295,134 @@ class _PayoutDialogState extends State<_PayoutDialog> {
       final amount = await Repository.instance.createPayout(widget.store.id, _note.text.trim());
       if (mounted) Navigator.pop(context);
       messenger.showSnackBar(SnackBar(content: Text('Pago de ${formatClp(amount)} a ${widget.store.name} registrado.')));
-    } on FirebaseFunctionsException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(e.message ?? 'No se pudo registrar.')));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(friendlyError(e, fallback: 'No se pudo registrar el pago.'))));
       if (mounted) setState(() => _saving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<BagOrder>>(
-      stream: Repository.instance.watchUnpaidOrders(widget.store.id),
-      builder: (context, snap) {
-        final orders = snap.data ?? const <BagOrder>[];
-        final gross = orders.fold<int>(0, (s, o) => s + o.amount);
-        final toPay = orders.fold<int>(0, (s, o) => s + o.storeAmount);
-        return AlertDialog(
-          title: Text('Liquidar a ${widget.store.name}'),
-          content: SizedBox(
-            width: 420,
-            child: !snap.hasData
-                ? const SizedBox(height: 80, child: Center(child: CircularProgressIndicator()))
-                : Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    if (orders.isEmpty)
-                      const Text('No tiene ventas pendientes de pago.')
-                    else ...[
-                      Text('${orders.length} ${orders.length == 1 ? 'venta' : 'ventas'} sin liquidar'
-                          '${_noShows(orders) > 0 ? ' (${_noShows(orders)} no retiradas por el cliente)' : ''}'),
-                      Text('Ventas ${formatClp(gross)} − comisión ${formatClp(gross - toPay)}'),
-                      const SizedBox(height: 8),
-                      Text('A pagar: ${formatClp(toPay)}', style: Theme.of(context).textTheme.titleLarge),
-                      const SizedBox(height: 12),
-                      const Text('Haz la transferencia al comercio y regístrala aquí:'),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _note,
-                        decoration: const InputDecoration(labelText: 'Nota (p. ej. n° de transferencia)'),
-                      ),
-                    ],
-                  ]),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar')),
-            if (orders.isNotEmpty)
-              FilledButton(onPressed: _saving ? null : _save, child: Text(_saving ? 'Registrando…' : 'Registrar pago')),
-          ],
-        );
-      },
+    return StreamBuilder<BankAccount?>(
+      stream: Repository.instance.watchBankAccount(widget.store.id),
+      builder: (context, bankSnap) => StreamBuilder<List<BagOrder>>(
+        stream: Repository.instance.watchUnpaidOrders(widget.store.id),
+        builder: (context, snap) {
+          final orders = snap.data ?? const <BagOrder>[];
+          final gross = orders.fold<int>(0, (s, o) => s + o.amount);
+          final toPay = orders.fold<int>(0, (s, o) => s + o.storeAmount);
+          final loading = !snap.hasData || bankSnap.connectionState == ConnectionState.waiting;
+          final bank = bankSnap.data;
+          return AlertDialog(
+            title: Text('Liquidar a ${widget.store.name}'),
+            content: SizedBox(
+              width: 440,
+              child: loading
+                  ? const SizedBox(height: 80, child: Center(child: CircularProgressIndicator()))
+                  : SingleChildScrollView(
+                      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        if (orders.isEmpty)
+                          const Text('No tiene ventas pendientes de pago.')
+                        else ...[
+                          Text('${orders.length} ${orders.length == 1 ? 'venta' : 'ventas'} sin liquidar'
+                              '${_noShows(orders) > 0 ? ' (${_noShows(orders)} no retiradas por el cliente)' : ''}'),
+                          Text('Ventas ${formatClp(gross)} − comisión ${formatClp(gross - toPay)}'),
+                          const SizedBox(height: 8),
+                          Text('A pagar: ${formatClp(toPay)}', style: Theme.of(context).textTheme.titleLarge),
+                          const SizedBox(height: 12),
+                          if (bank == null)
+                            const _Notice(
+                              text: 'Este local aún no registra su cuenta bancaria. Sus ventas quedan pendientes '
+                                  'hasta que la agregue en "Ventas y pagos".',
+                            )
+                          else ...[
+                            const Text('Transfiere a esta cuenta y registra el pago aquí:'),
+                            const SizedBox(height: 8),
+                            _BankDetails(bank: bank, amount: toPay),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _note,
+                              decoration: const InputDecoration(labelText: 'Nota (p. ej. n° de transferencia)'),
+                            ),
+                          ],
+                        ],
+                      ]),
+                    ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar')),
+              if (orders.isNotEmpty && bank != null)
+                FilledButton(onPressed: _saving ? null : _save, child: Text(_saving ? 'Registrando…' : 'Registrar pago')),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Datos de la cuenta de destino, cada uno con su botón de copiar (para pegar en el banco).
+class _BankDetails extends StatelessWidget {
+  const _BankDetails({required this.bank, required this.amount});
+
+  final BankAccount bank;
+  final int amount;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <(String, String)>[
+      ('Titular', bank.holder),
+      ('RUT', bank.rut),
+      ('Banco', bank.bank),
+      ('Tipo', bank.accountTypeLabel),
+      ('Número', bank.accountNumber),
+      if (bank.email.isNotEmpty) ('Correo', bank.email),
+      ('Monto', '$amount'),
+    ];
+    final muted = Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: Column(children: [
+          for (final (label, value) in rows)
+            Row(children: [
+              SizedBox(width: 64, child: Text(label, style: muted)),
+              Expanded(child: SelectableText(label == 'Monto' ? formatClp(amount) : value)),
+              IconButton(
+                tooltip: 'Copiar $label',
+                icon: const Icon(Icons.copy, size: 16),
+                visualDensity: VisualDensity.compact,
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: value));
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label copiado.')));
+                  }
+                },
+              ),
+            ]),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Aviso destacado dentro de un diálogo (p. ej. locales sin cuenta bancaria).
+class _Notice extends StatelessWidget {
+  const _Notice({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: WoowfyColors.orangeSoft, borderRadius: BorderRadius.circular(12)),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Icon(Icons.info_outline, size: 18, color: WoowfyColors.green),
+        const SizedBox(width: 8),
+        Expanded(child: Text(text)),
+      ]),
     );
   }
 }
@@ -381,7 +464,11 @@ class _PayAllBar extends StatelessWidget {
                   FilledButton(
                     onPressed: orders.isEmpty
                         ? null
-                        : () => showDialog<void>(context: context, builder: (_) => _PayAllDialog(orders: orders)),
+                        : () => showDialog<void>(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (_) => _PayAllDialog(orders: orders),
+                          ),
                     child: const Text('Liquidar todos'),
                   ),
                 ],
@@ -395,6 +482,7 @@ class _PayAllBar extends StatelessWidget {
 }
 
 /// Liquida a todos los locales de una vez y entrega la planilla para transferir en lote desde el banco.
+/// Primero muestra la vista previa (con la planilla ya copiable); los locales sin cuenta bancaria quedan fuera.
 class _PayAllDialog extends StatefulWidget {
   const _PayAllDialog({required this.orders});
 
@@ -406,11 +494,18 @@ class _PayAllDialog extends StatefulWidget {
 
 class _PayAllDialogState extends State<_PayAllDialog> {
   final _note = TextEditingController();
+  late final Future<Map<String, BankAccount?>> _banks = _loadBanks();
   bool _saving = false;
+  bool _copied = false;
 
-  /// Planilla generada después de registrar (null mientras no se registra).
-  String? _csv;
-  List<Map<String, dynamic>> _done = const [];
+  /// Liquidaciones ya registradas (null mientras no se registra).
+  List<Map<String, dynamic>>? _done;
+
+  Future<Map<String, BankAccount?>> _loadBanks() async {
+    final ids = widget.orders.map((o) => o.storeId).toSet().toList();
+    final accounts = await Future.wait(ids.map(Repository.instance.getBankAccount));
+    return {for (var i = 0; i < ids.length; i++) ids[i]: accounts[i]};
+  }
 
   @override
   void dispose() {
@@ -418,101 +513,199 @@ class _PayAllDialogState extends State<_PayAllDialog> {
     super.dispose();
   }
 
-  Future<void> _save() async {
+  static String _cell(Object? v) => '"${(v ?? '').toString().replaceAll('"', '""')}"';
+
+  /// Planilla para la transferencia en lote: una fila por local.
+  static String _csv(List<({String name, BankAccount bank, int amount, int count, String? payoutId})> rows) => [
+        'local,titular,rut,banco,tipo_cuenta,numero_cuenta,correo,monto,ventas,liquidacion',
+        for (final r in rows)
+          [r.name, r.bank.holder, r.bank.rut, r.bank.bank, r.bank.accountTypeLabel, r.bank.accountNumber, r.bank.email,
+                  r.amount, r.count, r.payoutId]
+              .map(_cell)
+              .join(','),
+      ].join('\n');
+
+  Future<void> _copy(String csv) async {
+    await Clipboard.setData(ClipboardData(text: csv));
+    setState(() => _copied = true);
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Planilla copiada (CSV).')));
+  }
+
+  Future<void> _save(List<String> storeIds) async {
     setState(() => _saving = true);
     try {
-      final payouts = await Repository.instance.createAllPayouts(_note.text.trim());
-      String cell(Object? v) => '"${(v ?? '').toString().replaceAll('"', '""')}"';
-      final rows = ['local,titular,rut,banco,tipo_cuenta,numero_cuenta,correo,monto,ventas,liquidacion'];
-      for (final p in payouts) {
-        final bank = await Repository.instance.getBankAccount(p['storeId'] as String);
-        rows.add([
-          p['storeName'], bank?.holder, bank?.rut, bank?.bank, bank?.accountTypeLabel, bank?.accountNumber, bank?.email,
-          p['storeAmount'], p['orderCount'], p['payoutId'],
-        ].map(cell).join(','));
-      }
+      final payouts = await Repository.instance.createAllPayouts(_note.text.trim(), storeIds);
       if (!mounted) return;
       setState(() {
         _done = payouts;
-        _csv = rows.join('\n');
+        _copied = false; // la planilla final (con los montos registrados) aún no se copia
         _saving = false;
       });
-    } on FirebaseFunctionsException catch (e) {
+    } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message ?? 'No se pudo registrar.')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(friendlyError(e, fallback: 'No se pudieron registrar las liquidaciones.'))));
       setState(() => _saving = false);
     }
   }
 
+  Future<void> _close() async {
+    if (_done != null && _done!.isNotEmpty && !_copied) {
+      final leave = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('¿Cerrar sin copiar la planilla?'),
+          content: const Text('Los pagos ya quedaron registrados. Sin la planilla tendrás que armar las transferencias '
+              'a mano con los datos de cada local.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Cerrar igual')),
+            FilledButton(onPressed: () => Navigator.pop(context, false), child: const Text('Volver')),
+          ],
+        ),
+      );
+      if (leave != true) return;
+    }
+    if (mounted) Navigator.pop(context);
+  }
+
   @override
   Widget build(BuildContext context) {
+    return FutureBuilder<Map<String, BankAccount?>>(
+      future: _banks,
+      builder: (context, snap) {
+        if (snap.hasError) {
+          return AlertDialog(
+            title: const Text('Liquidar a todos los locales'),
+            content: Text(friendlyError(snap.error!, fallback: 'No pudimos leer las cuentas bancarias de los locales.')),
+            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar'))],
+          );
+        }
+        if (!snap.hasData) {
+          return const AlertDialog(
+            title: Text('Liquidar a todos los locales'),
+            content: SizedBox(height: 80, child: Center(child: CircularProgressIndicator())),
+          );
+        }
+        return _done == null ? _preview(context, snap.data!) : _result(context, snap.data!);
+      },
+    );
+  }
+
+  Widget _preview(BuildContext context, Map<String, BankAccount?> banks) {
     final t = Theme.of(context).textTheme;
     final byStore = <String, List<BagOrder>>{};
     for (final o in widget.orders) {
-      byStore.putIfAbsent(o.storeName, () => []).add(o);
+      byStore.putIfAbsent(o.storeId, () => []).add(o);
     }
-    final total = widget.orders.fold<int>(0, (s, o) => s + o.storeAmount);
-
-    if (_csv != null) {
-      final paid = _done.fold<int>(0, (s, p) => s + (p['storeAmount'] as num).toInt());
-      return AlertDialog(
-        title: const Text('Liquidaciones registradas'),
-        content: SizedBox(
-          width: 460,
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${_done.length} ${_done.length == 1 ? 'local' : 'locales'} por ${formatClp(paid)}.'),
-            const SizedBox(height: 8),
-            const Text('Copia la planilla (nombre, RUT, banco, cuenta y monto de cada local) y úsala para las '
-                'transferencias desde el banco. Los locales sin datos bancarios salen con esas columnas vacías.'),
-          ]),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar')),
-          FilledButton.icon(
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: _csv!));
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Planilla copiada (CSV).')));
-              }
-            },
-            icon: const Icon(Icons.table_view_outlined, size: 18),
-            label: const Text('Copiar planilla'),
-          ),
-        ],
-      );
-    }
+    int sum(List<BagOrder> l) => l.fold<int>(0, (s, o) => s + o.storeAmount);
+    final ready = byStore.entries.where((e) => banks[e.key] != null).toList();
+    final missing = byStore.entries.where((e) => banks[e.key] == null).toList();
+    final total = ready.fold<int>(0, (s, e) => s + sum(e.value));
+    final csv = _csv([
+      for (final e in ready)
+        (name: e.value.first.storeName, bank: banks[e.key]!, amount: sum(e.value), count: e.value.length, payoutId: null),
+    ]);
 
     return AlertDialog(
       title: const Text('Liquidar a todos los locales'),
       content: SizedBox(
+        width: 480,
+        child: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            for (final e in ready)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(children: [
+                  Expanded(
+                    child: Text('${e.value.first.storeName} · ${e.value.length} ${e.value.length == 1 ? 'venta' : 'ventas'}'
+                        '${_noShows(e.value) > 0 ? ' (${_noShows(e.value)} no retiradas)' : ''}'),
+                  ),
+                  Text(formatClp(sum(e.value))),
+                ]),
+              ),
+            if (missing.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              _Notice(
+                text: '${missing.length == 1 ? '1 local no tiene' : '${missing.length} locales no tienen'} cuenta bancaria '
+                    'y ${missing.length == 1 ? 'queda' : 'quedan'} fuera: '
+                    '${missing.map((e) => '${e.value.first.storeName} (${formatClp(sum(e.value))})').join(', ')}. '
+                    'Sus ventas siguen pendientes hasta que la registren.',
+              ),
+            ],
+            const Divider(height: 24),
+            Row(children: [
+              Expanded(child: Text('Total a transferir', style: t.titleMedium)),
+              Text(formatClp(total), style: t.titleLarge),
+            ]),
+            if (ready.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _note,
+                decoration: const InputDecoration(labelText: 'Nota (p. ej. transferencias semana 40)'),
+              ),
+              const SizedBox(height: 8),
+              Text('Copia la planilla para las transferencias del banco. Al registrar, estas ventas quedan como pagadas.',
+                  style: t.bodySmall),
+            ],
+          ]),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: _saving ? null : () => Navigator.pop(context), child: const Text('Cancelar')),
+        if (ready.isNotEmpty) ...[
+          OutlinedButton.icon(
+            onPressed: () => _copy(csv),
+            icon: const Icon(Icons.table_view_outlined, size: 18),
+            label: const Text('Copiar planilla'),
+          ),
+          FilledButton(
+            onPressed: _saving ? null : () => _save([for (final e in ready) e.key]),
+            child: Text(_saving
+                ? 'Registrando…'
+                : 'Registrar ${ready.length} ${ready.length == 1 ? 'pago' : 'pagos'}'),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _result(BuildContext context, Map<String, BankAccount?> banks) {
+    final done = _done!;
+    final paid = done.fold<int>(0, (s, p) => s + (p['storeAmount'] as num).toInt());
+    final rows = [
+      for (final p in done)
+        if (banks[p['storeId']] != null)
+          (
+            name: p['storeName'] as String,
+            bank: banks[p['storeId']]!,
+            amount: (p['storeAmount'] as num).toInt(),
+            count: (p['orderCount'] as num).toInt(),
+            payoutId: p['payoutId'] as String?,
+          ),
+    ];
+    final csv = _csv(rows);
+    return AlertDialog(
+      title: const Text('Liquidaciones registradas'),
+      content: SizedBox(
         width: 460,
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          for (final e in byStore.entries)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(children: [
-                Expanded(
-                  child: Text('${e.key} · ${e.value.length} ${e.value.length == 1 ? 'venta' : 'ventas'}'
-                      '${_noShows(e.value) > 0 ? ' (${_noShows(e.value)} no retiradas)' : ''}'),
-                ),
-                Text(formatClp(e.value.fold<int>(0, (s, o) => s + o.storeAmount))),
-              ]),
-            ),
-          const Divider(),
-          Row(children: [
-            Expanded(child: Text('Total a transferir', style: t.titleMedium)),
-            Text(formatClp(total), style: t.titleLarge),
-          ]),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _note,
-            decoration: const InputDecoration(labelText: 'Nota (p. ej. transferencias semana 40)'),
-          ),
+          Text(done.isEmpty
+              ? 'No había ventas por liquidar en esos locales.'
+              : '${done.length} ${done.length == 1 ? 'local' : 'locales'} por ${formatClp(paid)}.'),
+          if (done.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Text('Copia la planilla final (con los montos registrados) y úsala para las transferencias desde el banco.'),
+          ],
         ]),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-        FilledButton(onPressed: _saving ? null : _save, child: Text(_saving ? 'Registrando…' : 'Registrar liquidaciones')),
+        TextButton(onPressed: _close, child: const Text('Cerrar')),
+        if (done.isNotEmpty)
+          FilledButton.icon(
+            onPressed: () => _copy(csv),
+            icon: Icon(_copied ? Icons.check : Icons.table_view_outlined, size: 18),
+            label: Text(_copied ? 'Planilla copiada' : 'Copiar planilla'),
+          ),
       ],
     );
   }

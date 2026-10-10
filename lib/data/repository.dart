@@ -80,8 +80,11 @@ class Repository {
       .map((s) => s.docs.map(BagOrder.fromDoc).where((o) => o.payoutId == null).toList());
 
   /// Admin: liquida a todos los locales con ventas pendientes. Devuelve lo registrado por local.
-  Future<List<Map<String, dynamic>>> createAllPayouts(String note) async {
-    final res = await functions.httpsCallable('createAllPayouts').call<Map<String, dynamic>>({'note': note});
+  /// Liquida solo a [storeIds] (los revisados en la vista previa). El servidor salta los locales sin cuenta bancaria.
+  Future<List<Map<String, dynamic>>> createAllPayouts(String note, List<String> storeIds) async {
+    final res = await functions
+        .httpsCallable('createAllPayouts')
+        .call<Map<String, dynamic>>({'note': note, 'storeIds': storeIds});
     return (res.data['payouts'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
   }
 

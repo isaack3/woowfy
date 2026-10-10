@@ -1,7 +1,7 @@
 # Woowfy — Hoja de ruta
 
 Marketplace de bolsas sorpresa contra el desperdicio de comida. Chile primero, luego Latam.
-Marca las casillas a medida que avancemos. Última actualización: 29-09-2026 (Sprint 4).
+Marca las casillas a medida que avancemos. Última actualización: 09-10-2026 (crítica de diseño, ronda 1).
 
 **En línea:** [woowfy.com](https://woowfy.com) (landing) · [app.woowfy.com](https://app.woowfy.com) (app)
 
@@ -150,6 +150,28 @@ y desplegada el 28-09; datos de producción migrados
 
 **Etapa D — Pagos divididos con Mercado Pago Marketplace** (después de la SpA; ver sección "Pagos divididos")
 - [ ] Cada local conecta su cuenta de Mercado Pago; MP le deposita el 75% y a Woowfy el 25% en cada compra
+
+### Diseño — crítica del 09-10 (Impeccable) · contexto en `PRODUCT.md`, crítica en `.impeccable/critique/`
+Puntajes (heurísticas de Nielsen): Home 22/40 · flujo cliente 22/40 · comercio 22/40 · admin 23/40 · landing 20/32.
+
+**Ronda 1 — bugs y errores rotos ✅** (probada en emuladores y desplegada el 09-10)
+- [x] Botones y barra de navegación en Lato (salían en Roboto)
+- [x] Errores legibles con "Reintentar" en toda la app (antes mostraban el error técnico en inglés)
+- [x] Día real del retiro: "hoy / mañana / sáb 10 oct" en tarjeta, detalle, comprobante (con fecha), pedidos y panel
+- [x] Precio al publicar acepta "3.500" (pone los puntos solo) y muestra el % de descuento; errores de horario específicos
+- [x] `/merchants` en celular: la sección "Entregar" ya no se sale de la pantalla
+- [x] "Sumar mi local" abre el formulario como comercio (`/?type=merchant#waitlist`)
+- [x] Liquidar todos: vista previa con planilla copiable **antes** de registrar; los locales sin cuenta bancaria
+      quedan fuera (también en el servidor) y no se puede cerrar sin aviso si no se copió la planilla final
+- [x] Liquidar un local: muestra la cuenta de destino con botones para copiar; sin cuenta no se puede registrar
+- [x] Interruptor de lanzamiento de la landing confirma o avisa si falla
+
+**Ronda 2 — por hacer** (orden sugerido)
+- [ ] Reglas de dinero antes de pagar (15 min, cancelar 2 h antes, sin retiro no hay reembolso) y controles de la Home con texto
+- [ ] Home vacía con salida ("cómo funciona", avísame, publica tu local) y selector de región
+- [ ] Ingreso con Google dentro de WhatsApp/Instagram (navegador interno) y retomar la reserva después del login
+- [ ] "Modo mostrador" para validar retiros en fila (escaneo continuo, confirmación grande, alerta de "ya retirado")
+- [ ] Landing: hero sin comercios inventados, menos recursos de plantilla, contraste del coral
 
 ### Próximo (por decidir)
 - [ ] Empleados por local, reclamos y moderación de opiniones, invitar amigos (referidos)

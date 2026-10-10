@@ -57,7 +57,7 @@ class BagCard extends StatelessWidget {
                   Row(children: [
                     const Icon(Icons.schedule, size: 14, color: WoowfyColors.muted),
                     const SizedBox(width: 4),
-                    Text('Retiro hoy ${formatPickupWindow(bag.pickupStart, bag.pickupEnd)}',
+                    Text('Retiro ${formatPickup(bag.pickupStart, bag.pickupEnd)}',
                         style: t.bodySmall?.copyWith(color: WoowfyColors.muted)),
                     if (distance != null) ...[
                       const Spacer(),

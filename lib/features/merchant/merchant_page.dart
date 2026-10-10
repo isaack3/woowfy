@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/errors.dart';
 import '../../core/format.dart';
 import '../../core/legal.dart';
 import '../../core/theme.dart';
@@ -27,10 +28,10 @@ class MerchantPage extends StatelessWidget {
         title: const Text('Panel del comercio'),
         leading: BackButton(onPressed: () => context.go('/')),
       ),
-      body: StreamBuilder<Store?>(
+      body: Reloadable(builder: (context) => StreamBuilder<Store?>(
         stream: Repository.instance.watchMyStore(uid),
         builder: (context, snap) {
-          if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
+          if (snap.hasError) return ErrorRetry(title: 'No pudimos cargar tu local', error: snap.error);
           if (snap.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -47,7 +48,7 @@ class MerchantPage extends StatelessWidget {
             child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 720), child: child),
           );
         },
-      ),
+      )),
     );
   }
 }
@@ -241,10 +242,10 @@ class _Dashboard extends StatelessWidget {
         icon: const Icon(Icons.add),
         label: const Text('Publicar bolsa'),
       ),
-      body: StreamBuilder<List<Bag>>(
+      body: Reloadable(builder: (context) => StreamBuilder<List<Bag>>(
         stream: Repository.instance.watchStoreBags(store.id),
         builder: (context, snap) {
-          if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
+          if (snap.hasError) return ErrorRetry(title: 'No pudimos cargar tus bolsas', error: snap.error);
           if (!snap.hasData) return const Center(child: CircularProgressIndicator());
           final bags = snap.data!;
           return ListView(
@@ -279,8 +280,7 @@ class _Dashboard extends StatelessWidget {
                     ),
                     title: Text('${bag.title} · ${formatClp(bag.price)}${bag.templateId != null ? ' · recurrente' : ''}'),
                     subtitle: Text(
-                      '${bag.pickupStart.day}/${bag.pickupStart.month} '
-                      '${formatPickupWindow(bag.pickupStart, bag.pickupEnd)} · '
+                      '${formatPickup(bag.pickupStart, bag.pickupEnd)} · '
                       'Quedan ${bag.quantityAvailable}',
                     ),
                     trailing: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -299,7 +299,7 @@ class _Dashboard extends StatelessWidget {
             ],
           );
         },
-      ),
+      )),
     );
   }
 }
@@ -343,7 +343,7 @@ class _ToPickUp extends StatelessWidget {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     title: Text(o.bagTitle),
-                    subtitle: Text('Retiro ${formatPickupWindow(o.pickupStart, o.pickupEnd)}'),
+                    subtitle: Text('Retiro ${formatPickup(o.pickupStart, o.pickupEnd)}'),
                     trailing: Text(formatClp(o.amount)),
                   ),
               ],

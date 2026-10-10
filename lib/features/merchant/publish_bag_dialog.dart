@@ -1,8 +1,8 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/errors.dart';
 import '../../core/format.dart';
 import '../../core/theme.dart';
 import '../../data/models.dart';
@@ -69,17 +69,21 @@ class _PublishBagDialogState extends State<PublishBagDialog> {
 
   Future<void> _save() async {
     if (!_form.currentState!.validate()) return;
-    final original = int.parse(_originalPrice.text);
-    final price = int.parse(_price.text);
+    final original = _amount(_originalPrice.text)!;
+    final price = _amount(_price.text)!;
     final start = _today(_start);
     final end = _today(_end);
     if (price >= original) {
-      setState(() => _error = 'El precio debe ser menor al valor original.');
+      setState(() => _error = 'La oferta debe ser menor al precio normal.');
+      return;
+    }
+    if (!end.isAfter(start)) {
+      setState(() => _error = 'El retiro termina antes de empezar. Revisa las horas.');
       return;
     }
     // Una bolsa recurrente puede crearse aunque el horario de hoy ya pasó (parte mañana).
-    if (!end.isAfter(start) || (!_repeat && end.isBefore(DateTime.now()))) {
-      setState(() => _error = 'Revisa el horario de retiro.');
+    if (!_repeat && end.isBefore(DateTime.now())) {
+      setState(() => _error = 'Ese horario de retiro ya pasó. Elige una hora más tarde.');
       return;
     }
     if (_repeat && _days.isEmpty) {
@@ -124,7 +128,7 @@ class _PublishBagDialogState extends State<PublishBagDialog> {
       );
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
-      setState(() => _error = 'No se pudo publicar: $e');
+      setState(() => _error = friendlyError(e, fallback: 'No se pudo publicar. Intenta de nuevo.'));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -132,8 +136,9 @@ class _PublishBagDialogState extends State<PublishBagDialog> {
 
   @override
   Widget build(BuildContext context) {
-    String? positiveInt(String? v) =>
-        (int.tryParse(v ?? '') ?? 0) > 0 ? null : 'Ingresa un número mayor a 0';
+    String? positiveInt(String? v) => (_amount(v) ?? 0) > 0 ? null : 'Ingresa un número mayor a 0';
+    final digits = [FilteringTextInputFormatter.digitsOnly];
+    final money = [_ThousandsFormatter()];
     return AlertDialog(
       title: Text(_repeat ? 'Bolsa recurrente' : 'Publicar bolsa de hoy'),
       content: SizedBox(
@@ -164,6 +169,7 @@ class _PublishBagDialogState extends State<PublishBagDialog> {
                       child: TextFormField(
                         controller: _originalPrice,
                         keyboardType: TextInputType.number,
+                        inputFormatters: money,
                         decoration: const InputDecoration(labelText: 'Normal', prefixText: '\$ '),
                         validator: positiveInt,
                       ),
@@ -173,6 +179,7 @@ class _PublishBagDialogState extends State<PublishBagDialog> {
                       child: TextFormField(
                         controller: _price,
                         keyboardType: TextInputType.number,
+                        inputFormatters: money,
                         decoration: const InputDecoration(labelText: 'Oferta', prefixText: '\$ '),
                         validator: positiveInt,
                       ),
@@ -180,16 +187,20 @@ class _PublishBagDialogState extends State<PublishBagDialog> {
                   ],
                 ),
                 // Siempre a la vista: cuánto recibe el local y la comisión de Woowfy.
-                ValueListenableBuilder<TextEditingValue>(
-                  valueListenable: _price,
-                  builder: (context, v, _) {
-                    final price = int.tryParse(v.text.trim());
+                ListenableBuilder(
+                  listenable: Listenable.merge([_price, _originalPrice]),
+                  builder: (context, _) {
+                    final price = _amount(_price.text);
+                    final original = _amount(_originalPrice.text);
+                    final discount = price != null && original != null && original > price && price > 0
+                        ? '${((1 - price / original) * 100).round()}% de descuento · '
+                        : '';
                     return Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(
                         price == null || price <= 0
                             ? 'Woowfy cobra una comisión de $platformFeePercent sobre el precio de oferta.'
-                            : 'Recibes ${formatClp(storeShareOf(price))} por bolsa (comisión Woowfy $platformFeePercent).',
+                            : '${discount}Recibes ${formatClp(storeShareOf(price))} por bolsa (comisión Woowfy $platformFeePercent).',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(color: WoowfyColors.muted),
                       ),
                     );
@@ -199,6 +210,7 @@ class _PublishBagDialogState extends State<PublishBagDialog> {
                 TextFormField(
                   controller: _quantity,
                   keyboardType: TextInputType.number,
+                  inputFormatters: digits,
                   decoration: const InputDecoration(labelText: 'Cantidad de bolsas'),
                   validator: positiveInt,
                 ),
@@ -291,5 +303,30 @@ class _PhotoPicker extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Monto escrito por el comercio: acepta "3.500" o "3500".
+int? _amount(String? text) => int.tryParse((text ?? '').replaceAll('.', '').trim());
+
+/// Deja solo dígitos y agrega el punto de miles mientras se escribe (3500 → 3.500).
+class _ThousandsFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    final digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return const TextEditingValue();
+    if (digits.length > 9) return oldValue;
+    final text = _group(digits);
+    return TextEditingValue(text: text, selection: TextSelection.collapsed(offset: text.length));
+  }
+
+  static String _group(String digits) {
+    final n = digits.replaceFirst(RegExp(r'^0+(?=\d)'), '');
+    final out = StringBuffer();
+    for (var i = 0; i < n.length; i++) {
+      if (i > 0 && (n.length - i) % 3 == 0) out.write('.');
+      out.write(n[i]);
+    }
+    return out.toString();
   }
 }

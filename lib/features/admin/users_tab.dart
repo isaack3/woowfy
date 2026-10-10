@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/errors.dart';
 import '../../core/theme.dart';
 import '../../data/models.dart';
 import '../../data/repository.dart';
@@ -17,7 +18,7 @@ class UsersTab extends StatefulWidget {
 }
 
 class _UsersTabState extends State<UsersTab> {
-  final _users = Repository.instance.watchUsers();
+  Stream<List<AppUser>> _users = Repository.instance.watchUsers();
   String _query = '';
   bool _onlyAdmins = false;
 
@@ -27,7 +28,7 @@ class _UsersTabState extends State<UsersTab> {
     return StreamBuilder<List<AppUser>>(
       stream: _users,
       builder: (context, snap) {
-        if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
+        if (snap.hasError) return ErrorRetry(title: 'No pudimos cargar los usuarios', error: snap.error, onRetry: () => setState(() => _users = Repository.instance.watchUsers()));
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         final all = snap.data!;
         final q = _query.trim().toLowerCase();
@@ -112,7 +113,7 @@ class _UsersTabState extends State<UsersTab> {
       await Repository.instance.setUserRole(u.id, role);
       messenger.showSnackBar(SnackBar(content: Text(makeAdmin ? '${u.email} ahora es admin' : '${u.email} ya no es admin')));
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('No se pudo cambiar el rol: $e')));
+      messenger.showSnackBar(SnackBar(content: Text(friendlyError(e, fallback: 'No se pudo cambiar el rol. Intenta de nuevo.'))));
     }
   }
 }

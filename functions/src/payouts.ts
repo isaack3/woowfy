@@ -8,6 +8,12 @@ const PAYABLE_STATUSES = ["picked_up", "no_show"];
 
 type PayoutResult = { payoutId: string; storeId: string; storeName: string; orderCount: number; storeAmount: number };
 
+/** Un local sin cuenta bancaria no se liquida: no habría a dónde transferirle. */
+async function hasBankAccount(storeId: string): Promise<boolean> {
+  const bank = await getFirestore().collection("stores").doc(storeId).collection("private").doc("bank").get();
+  return bank.exists && Boolean(bank.data()?.accountNumber);
+}
+
 async function requireAdmin(uid: string | undefined): Promise<string> {
   if (!uid) throw new HttpsError("unauthenticated", "Debes iniciar sesión.");
   const me = (await getFirestore().collection("users").doc(uid).get()).data();
@@ -70,26 +76,40 @@ export const createPayout = onCall(async (req) => {
   const note = String(req.data?.note ?? "").trim().slice(0, 200);
   const store = (await getFirestore().collection("stores").doc(storeId).get()).data();
   if (!store) throw new HttpsError("not-found", "Local no encontrado.");
+  if (!(await hasBankAccount(storeId))) {
+    throw new HttpsError("failed-precondition", "Este local aún no registra su cuenta bancaria.");
+  }
 
   const result = await payoutStore(storeId, store.name, note, uid);
   if (!result) throw new HttpsError("failed-precondition", "Este local no tiene ventas por liquidar.");
   return result;
 });
 
-/** Liquida de una vez a todos los locales con ventas pendientes (para transferir en lote). */
+/**
+ * Liquida de una vez a los locales con ventas pendientes (para transferir en lote). Si se pasa storeIds, solo a
+ * esos (los que el admin revisó en la vista previa). Los locales sin cuenta bancaria quedan fuera y se informan.
+ */
 export const createAllPayouts = onCall(async (req) => {
   const uid = await requireAdmin(req.auth?.uid);
   const note = String(req.data?.note ?? "").trim().slice(0, 200);
   const db = getFirestore();
   // Suficiente para el piloto; con mucho volumen convendría un campo "por liquidar" indexado.
   const payable = await db.collection("orders").where("status", "in", PAYABLE_STATUSES).get();
-  const storeIds = [...new Set(payable.docs.filter((d) => !d.data().payoutId).map((d) => d.data().storeId as string))];
+  const requested = Array.isArray(req.data?.storeIds) ? new Set((req.data.storeIds as unknown[]).map(String)) : null;
+  const storeIds = [...new Set(payable.docs.filter((d) => !d.data().payoutId).map((d) => d.data().storeId as string))]
+    .filter((id) => !requested || requested.has(id));
 
   const payouts: PayoutResult[] = [];
+  const skipped: { storeId: string; storeName: string }[] = [];
   for (const storeId of storeIds) {
     const store = (await db.collection("stores").doc(storeId).get()).data();
-    const result = await payoutStore(storeId, store?.name ?? storeId, note, uid);
+    const storeName = store?.name ?? storeId;
+    if (!(await hasBankAccount(storeId))) {
+      skipped.push({ storeId, storeName });
+      continue;
+    }
+    const result = await payoutStore(storeId, storeName, note, uid);
     if (result) payouts.push(result);
   }
-  return { payouts };
+  return { payouts, skipped };
 });

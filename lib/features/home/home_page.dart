@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../core/errors.dart';
 import '../../core/location.dart';
 import '../../core/theme.dart';
 import '../../data/models.dart';
@@ -28,7 +29,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final _bags = Repository.instance.watchAvailableBags();
+  Stream<List<Bag>> _bags = Repository.instance.watchAvailableBags();
   final _uid = FirebaseAuth.instance.currentUser?.uid;
   late final Stream<Set<String>> _favorites = _uid == null
       ? Stream.value(<String>{})
@@ -168,9 +169,10 @@ class _HomePageState extends State<HomePage> {
                 if (snap.hasError)
                   SliverFillRemaining(
                     hasScrollBody: false,
-                    child: _Message(
-                      icon: Icons.cloud_off,
-                      text: 'No pudimos cargar las bolsas.\n${snap.error}',
+                    child: ErrorRetry(
+                      title: 'No pudimos cargar las bolsas',
+                      error: snap.error,
+                      onRetry: () => setState(() => _bags = Repository.instance.watchAvailableBags()),
                     ),
                   )
                 else if (bags == null)

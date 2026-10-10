@@ -1,6 +1,7 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/errors.dart';
 import '../../data/models.dart';
 import '../../data/repository.dart';
 import 'email_preview.dart';
@@ -13,10 +14,10 @@ class EmailSettingsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<EmailSettings>(
+    return Reloadable(builder: (context) => StreamBuilder<EmailSettings>(
       stream: Repository.instance.watchEmailSettings(),
       builder: (context, snap) {
-        if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
+        if (snap.hasError) return ErrorRetry(title: 'No pudimos cargar la configuración de correo', error: snap.error);
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         return Center(
           child: ConstrainedBox(
@@ -26,7 +27,7 @@ class EmailSettingsTab extends StatelessWidget {
           ),
         );
       },
-    );
+    ));
   }
 }
 
@@ -71,7 +72,7 @@ class _FormState extends State<_Form> {
       ));
       messenger.showSnackBar(const SnackBar(content: Text('Configuración guardada')));
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('No se pudo guardar: $e')));
+      messenger.showSnackBar(SnackBar(content: Text(friendlyError(e, fallback: 'No se pudo guardar. Intenta de nuevo.'))));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -84,7 +85,7 @@ class _FormState extends State<_Form> {
       final to = await Repository.instance.sendTestEmail(kind);
       messenger.showSnackBar(SnackBar(content: Text('Correo de prueba enviado a $to')));
     } on FirebaseFunctionsException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Falló el envío: ${e.message ?? e.code}')));
+      messenger.showSnackBar(SnackBar(content: Text('Falló el envío: ${friendlyError(e)}')));
     } finally {
       if (mounted) setState(() => _testing = false);
     }
@@ -244,7 +245,7 @@ class _TemplatesDialogState extends State<_TemplatesDialog> {
               child: FutureBuilder<({String subject, String html})>(
                 future: _mail,
                 builder: (context, snap) {
-                  if (snap.hasError) return Center(child: Text('No se pudo cargar: ${snap.error}'));
+                  if (snap.hasError) return ErrorRetry(title: 'No pudimos cargar la vista previa', error: snap.error, onRetry: () => setState(() => _mail = Repository.instance.previewEmail(_kind)));
                   if (!snap.hasData) return const Center(child: CircularProgressIndicator());
                   return Column(children: [
                     Padding(

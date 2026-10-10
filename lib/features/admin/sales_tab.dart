@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/errors.dart';
 import '../../core/format.dart';
 import '../../core/theme.dart';
 import '../../data/models.dart';
@@ -42,7 +43,7 @@ class _SalesTabState extends State<SalesTab> {
     return StreamBuilder<List<BagOrder>>(
       stream: _orders,
       builder: (context, snap) {
-        if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
+        if (snap.hasError) return ErrorRetry(title: 'No pudimos cargar las ventas', error: snap.error, onRetry: () => setState(() => _orders = Repository.instance.watchOrdersSince(_period.since)));
         final orders = snap.data;
         return ListView(
           padding: const EdgeInsets.all(16),

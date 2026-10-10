@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/errors.dart';
 import '../../core/theme.dart';
 import '../../data/chile.dart';
 import '../../data/models.dart';
@@ -74,7 +75,7 @@ class _StoreProfileDialogState extends State<StoreProfileDialog> {
       });
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      setState(() => _error = 'No se pudo guardar: $e');
+      setState(() => _error = friendlyError(e, fallback: 'No se pudo guardar. Intenta de nuevo.'));
     } finally {
       if (mounted) setState(() => _saving = false);
     }

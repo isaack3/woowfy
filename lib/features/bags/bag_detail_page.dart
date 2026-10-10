@@ -1,10 +1,10 @@
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../core/errors.dart';
 import '../../core/analytics.dart';
 import '../../core/checkout.dart';
 import '../../core/format.dart';
@@ -197,7 +197,7 @@ class _Detail extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Retiro hoy ${formatPickupWindow(bag.pickupStart, bag.pickupEnd)}',
+                                'Retiro ${formatPickup(bag.pickupStart, bag.pickupEnd)}',
                                 style: t.titleMedium,
                               ),
                               Text(
@@ -274,9 +274,11 @@ class _ReserveButtonState extends State<_ReserveButton> {
     try {
       final order = await Repository.instance.createOrder(widget.bag.id);
       if (mounted) await openCheckout(context, order.checkoutUrl);
-    } on FirebaseFunctionsException catch (e) {
+    } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message ?? e.code)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(friendlyError(e, fallback: 'No pudimos reservar la bolsa. Intenta de nuevo.'))),
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);

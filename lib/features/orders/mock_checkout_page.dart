@@ -1,7 +1,7 @@
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/errors.dart';
 import '../../core/format.dart';
 import '../../data/models.dart';
 import '../../data/repository.dart';
@@ -25,9 +25,11 @@ class _MockCheckoutPageState extends State<MockCheckoutPage> {
     try {
       await Repository.instance.confirmMockPayment(widget.orderId, approved: approved);
       if (mounted) context.go('/order/${widget.orderId}');
-    } on FirebaseFunctionsException catch (e) {
+    } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message ?? e.code)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(friendlyError(e, fallback: 'No pudimos confirmar el pago. Intenta de nuevo.'))),
+        );
         setState(() => _busy = false);
       }
     }
