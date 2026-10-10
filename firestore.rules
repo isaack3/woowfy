@@ -76,13 +76,13 @@ service cloud.firestore {
         || ownsApprovedStore(resource.data.storeId)
         || isAdmin();
       allow create: if ownsApprovedStore(request.resource.data.storeId)
-        && request.resource.data.price > 0
+        && request.resource.data.price >= 500
         && request.resource.data.price < request.resource.data.originalPrice
         && !request.resource.data.keys().hasAny(['storeRatingAvg', 'storeRatingCount']);
       // El admin puede pausar bolsas (p. ej. al suspender un comercio).
       allow update: if isAdmin() || (ownsApprovedStore(resource.data.storeId)
         && request.resource.data.storeId == resource.data.storeId
-        && request.resource.data.price > 0
+        && request.resource.data.price >= 500
         && request.resource.data.price < request.resource.data.originalPrice
         && !touchesRating(resource.data, request.resource.data));
       allow delete: if ownsApprovedStore(resource.data.storeId) || isAdmin();
@@ -91,7 +91,7 @@ service cloud.firestore {
     // Plantillas de bolsas recurrentes: las publica cada día la función publishRecurringBags.
     match /bagTemplates/{id} {
       function validTemplate(d) {
-        return d.price > 0 && d.price < d.originalPrice && d.quantity > 0
+        return d.price >= 500 && d.price < d.originalPrice && d.quantity > 0
           && d.days is list && d.days.size() > 0;
       }
       allow read: if ownsApprovedStore(resource.data.storeId) || isAdmin();

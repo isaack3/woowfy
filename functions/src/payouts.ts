@@ -126,3 +126,25 @@ export const createAllPayouts = onCall(async (req) => {
   }
   return { payouts, skipped };
 });
+
+/**
+ * Anula una liquidación registrada por error (p. ej. la transferencia no se hizo): sus ventas vuelven a quedar
+ * por pagar y la liquidación queda en el historial marcada como anulada, con el motivo.
+ */
+export const voidPayout = onCall(async (req) => {
+  const uid = await requireAdmin(req.auth?.uid);
+  const payoutId = String(req.data?.payoutId ?? "");
+  const reason = String(req.data?.reason ?? "").trim().slice(0, 200);
+  if (!payoutId) throw new HttpsError("invalid-argument", "Falta la liquidación.");
+  const db = getFirestore();
+  const ref = db.collection("payouts").doc(payoutId);
+  return db.runTransaction(async (tx) => {
+    const payout = await tx.get(ref);
+    if (!payout.exists) throw new HttpsError("not-found", "Liquidación no encontrada.");
+    if (payout.data()?.voidedAt) throw new HttpsError("failed-precondition", "Esta liquidación ya estaba anulada.");
+    const orders = await tx.get(db.collection("orders").where("payoutId", "==", payoutId));
+    orders.docs.forEach((d) => tx.update(d.ref, { payoutId: FieldValue.delete() }));
+    tx.update(ref, { voidedAt: FieldValue.serverTimestamp(), voidedBy: uid, voidReason: reason });
+    return { orderCount: orders.size };
+  });
+});

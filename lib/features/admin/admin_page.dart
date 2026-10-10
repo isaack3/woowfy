@@ -184,10 +184,15 @@ class _AdminShellState extends State<_AdminShell> with SingleTickerProviderState
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _controller,
-        children: [for (final t in _tabs) _Section(slug: t.slug, icon: t.icon, info: t.info, child: t.child)],
-      ),
+      body: Column(children: [
+        const LaunchBanner(),
+        Expanded(
+          child: TabBarView(
+            controller: _controller,
+            children: [for (final t in _tabs) _Section(slug: t.slug, icon: t.icon, info: t.info, child: t.child)],
+          ),
+        ),
+      ]),
     );
   }
 }

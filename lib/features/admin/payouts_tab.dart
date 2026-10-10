@@ -114,6 +114,50 @@ class _History extends StatelessWidget {
     }
   }
 
+  /// Anular: solo si la transferencia no se hizo. Las ventas vuelven a "por pagar".
+  Future<void> _void(BuildContext context, Payout p) async {
+    final reason = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Anular liquidación'),
+        content: SizedBox(
+          width: 420,
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('${p.storeName} · ${formatClp(p.storeAmount)}', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text('Sus ${p.orderCount} ${p.orderCount == 1 ? 'venta vuelve' : 'ventas vuelven'} a "por pagar" y el local deja de '
+                'verla como pago recibido. Anula solo si no transferiste.'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reason,
+              maxLength: 200,
+              decoration: const InputDecoration(labelText: 'Motivo', hintText: 'La transferencia fue rechazada.'),
+            ),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Volver')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Anular'),
+          ),
+        ],
+      ),
+    );
+    final text = reason.text.trim();
+    reason.dispose();
+    if (ok != true || !context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final n = await Repository.instance.voidPayout(p.id, text);
+      messenger.showSnackBar(SnackBar(content: Text('Liquidación anulada: $n ${n == 1 ? 'venta volvió' : 'ventas volvieron'} a "por pagar".')));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(friendlyError(e, fallback: 'No se pudo anular. Intenta de nuevo.'))));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final muted = Theme.of(context).textTheme.bodySmall?.copyWith(color: WoowfyColors.muted);
@@ -132,18 +176,34 @@ class _History extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Card(
                 child: ListTile(
-                  leading: const Icon(Icons.account_balance_outlined, color: WoowfyColors.green),
-                  title: Text('${p.storeName} · ${formatClp(p.storeAmount)}'),
+                  leading: Icon(p.voided ? Icons.block : Icons.account_balance_outlined,
+                      color: p.voided ? WoowfyColors.muted : WoowfyColors.green),
+                  title: Text(
+                    '${p.storeName} · ${formatClp(p.storeAmount)}',
+                    style: p.voided ? const TextStyle(decoration: TextDecoration.lineThrough, color: WoowfyColors.muted) : null,
+                  ),
                   subtitle: Text([
+                    if (p.voided) 'Anulada${p.voidReason.isEmpty ? '' : ': ${p.voidReason}'}',
                     if (p.createdAt != null) _date.format(p.createdAt!),
                     '${p.orderCount} ${p.orderCount == 1 ? 'venta' : 'ventas'}',
                     if (p.note.isNotEmpty) p.note,
                   ].join(' · ')),
-                  trailing: TextButton.icon(
-                    onPressed: () => _copy(context, p),
-                    icon: const Icon(Icons.table_view_outlined, size: 18),
-                    label: const Text('Copiar planilla'),
-                  ),
+                  trailing: p.voided
+                      ? null
+                      : PopupMenuButton<String>(
+                          tooltip: 'Opciones de la liquidación',
+                          onSelected: (v) => v == 'copy' ? _copy(context, p) : _void(context, p),
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(
+                              value: 'copy',
+                              child: ListTile(leading: Icon(Icons.table_view_outlined), title: Text('Copiar planilla')),
+                            ),
+                            PopupMenuItem(
+                              value: 'void',
+                              child: ListTile(leading: Icon(Icons.block), title: Text('Anular')),
+                            ),
+                          ],
+                        ),
                 ),
               ),
             ),

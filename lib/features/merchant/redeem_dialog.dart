@@ -38,18 +38,33 @@ class _RedeemDialogState extends State<RedeemDialog> {
     await _redeem();
   }
 
-  Future<void> _redeem() async {
+  Future<void> _redeem({bool force = false}) async {
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      final r = await Repository.instance.redeemOrder(_code.text);
+      final r = await Repository.instance.redeemOrder(_code.text, force: force);
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Entrega: ${r.bagTitle} · pagado ${formatClp(r.amount)}')),
       );
+    } on RedeemTooEarly catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Aún no es hora'),
+          content: Text('El retiro es desde las ${e.from} (1 × ${e.bagTitle}). Entrégala solo si ya está lista.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('No entregar')),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Entregar igual')),
+          ],
+        ),
+      );
+      if (ok == true && mounted) await _redeem(force: true);
     } catch (e) {
       if (mounted) setState(() => _error = friendlyError(e, fallback: 'No pudimos validar el código. Intenta de nuevo.'));
     } finally {

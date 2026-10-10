@@ -200,38 +200,83 @@ class _EmailBadge extends StatelessWidget {
   }
 }
 
+/// Cambia el modo de woowfy.com, con confirmación.
+Future<void> toggleSiteLaunch(BuildContext context, bool launched) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(launched ? 'Lanzar Woowfy' : 'Volver a "en construcción"'),
+      content: Text(launched
+          ? 'woowfy.com dejará de decir "en construcción" y llevará a las personas a la app para comprar y a los '
+              'locales a pedir su alta. Hazlo cuando tengas locales activos y pagos reales.'
+          : 'woowfy.com volverá a mostrar "en construcción" y la lista de espera.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(launched ? 'Lanzar' : 'Volver')),
+      ],
+    ),
+  );
+  if (ok != true || !context.mounted) return;
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    await Repository.instance.setSiteLaunched(launched);
+    messenger.showSnackBar(SnackBar(
+      content: Text(launched ? 'woowfy.com ya está lanzada.' : 'woowfy.com volvió a "en construcción".'),
+    ));
+  } catch (e) {
+    messenger.showSnackBar(SnackBar(
+      content: Text(friendlyError(e, fallback: 'No se pudo cambiar el modo de woowfy.com. Intenta de nuevo.')),
+    ));
+  }
+}
+
+/// Mientras woowfy.com siga "en construcción", un aviso arriba de todas las pestañas del admin con el botón para
+/// lanzar (antes estaba escondido en Interesados). Ya lanzada, desaparece; el interruptor sigue en Interesados.
+class LaunchBanner extends StatelessWidget {
+  const LaunchBanner({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return StreamBuilder<bool>(
+      stream: Repository.instance.watchSiteLaunched(),
+      builder: (context, snap) {
+        if (!snap.hasData || snap.data == true) return const SizedBox.shrink();
+        return Material(
+          color: WoowfyColors.orangeSoft,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
+            child: Row(children: [
+              const Icon(Icons.construction_outlined, color: WoowfyColors.green),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('woowfy.com está "en construcción"', style: t.titleSmall),
+                  FutureBuilder<int>(
+                    future: Repository.instance.waitlistCount(),
+                    builder: (context, n) => Text(
+                      n.hasData ? '${n.data} ${n.data == 1 ? 'interesado espera' : 'interesados esperan'} el lanzamiento' : ' ',
+                      style: t.bodySmall,
+                    ),
+                  ),
+                ]),
+              ),
+              FilledButton.icon(
+                onPressed: () => toggleSiteLaunch(context, true),
+                icon: const Icon(Icons.rocket_launch_outlined, size: 18),
+                label: const Text('Lanzar'),
+              ),
+            ]),
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// Interruptor del modo de la landing (woowfy.com): "en construcción" con lista de espera, o lanzada con acceso a la app.
 class _LaunchCard extends StatelessWidget {
   const _LaunchCard();
-
-  Future<void> _toggle(BuildContext context, bool launched) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(launched ? 'Lanzar Woowfy' : 'Volver a "en construcción"'),
-        content: Text(launched
-            ? 'woowfy.com dejará de decir "en construcción" y llevará a las personas a la app para comprar y a los '
-                'locales a pedir su alta. Hazlo cuando tengas locales activos y pagos reales.'
-            : 'woowfy.com volverá a mostrar "en construcción" y la lista de espera.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(launched ? 'Lanzar' : 'Volver')),
-        ],
-      ),
-    );
-    if (ok != true || !context.mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      await Repository.instance.setSiteLaunched(launched);
-      messenger.showSnackBar(SnackBar(
-        content: Text(launched ? 'woowfy.com ya está lanzada.' : 'woowfy.com volvió a "en construcción".'),
-      ));
-    } catch (e) {
-      messenger.showSnackBar(SnackBar(
-        content: Text(friendlyError(e, fallback: 'No se pudo cambiar el modo de woowfy.com. Intenta de nuevo.')),
-      ));
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -258,7 +303,7 @@ class _LaunchCard extends StatelessWidget {
                   ),
                 ]),
               ),
-              Switch(value: launched, onChanged: snap.hasData ? (v) => _toggle(context, v) : null),
+              Switch(value: launched, onChanged: snap.hasData ? (v) => toggleSiteLaunch(context, v) : null),
             ]),
           ),
         );

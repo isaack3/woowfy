@@ -9,7 +9,7 @@ export {
   cancelBag, cancelOrder, confirmMockPayment, createOrder, expirePendingOrders, markNoShows, mercadoPagoWebhook, redeemOrder, syncOrderPayment,
 } from "./orders.js";
 export { rateOrder } from "./reviews.js";
-export { createAllPayouts, createPayout } from "./payouts.js";
+export { createAllPayouts, createPayout, voidPayout } from "./payouts.js";
 export { trackEvent } from "./analytics.js";
 export { joinWaitlist } from "./waitlist.js";
 export { onOrderUpdated, onWaitlistCreated, previewEmail, sendTestEmail } from "./email.js";

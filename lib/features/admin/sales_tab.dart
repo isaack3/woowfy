@@ -30,7 +30,7 @@ class SalesTab extends StatefulWidget {
 }
 
 class _SalesTabState extends State<SalesTab> {
-  _Period _period = _Period.today;
+  _Period _period = _Period.week;
   late Stream<List<BagOrder>> _orders = Repository.instance.watchOrdersSince(_period.since);
 
   void _select(_Period p) => setState(() {

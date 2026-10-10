@@ -437,6 +437,7 @@ class _Rules extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Column(children: [
           rule(Icons.timer_outlined, ruleHold),
+          rule(Icons.schedule, rulePickupWindow),
           rule(Icons.undo, ruleCancel),
           rule(Icons.info_outline, ruleNoShow),
         ]),

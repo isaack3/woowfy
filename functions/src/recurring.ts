@@ -74,6 +74,7 @@ async function ensureTodayBag(templateId: string, t: Template, now = new Date())
       originalPrice: t.originalPrice,
       price: t.price,
       quantityAvailable: t.quantity,
+      quantity: t.quantity,
       pickupStart: Timestamp.fromDate(pickupStart),
       pickupEnd: Timestamp.fromDate(pickupEnd),
       active: true,

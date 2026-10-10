@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import '../core/backend.dart';
@@ -118,6 +119,12 @@ class Repository {
       .map((s) => s.docs.map(Payout.fromDoc).toList());
 
   /// Admin: registra el pago de las ventas pendientes de un local.
+  /// Anula una liquidación: sus ventas vuelven a "por pagar". Devuelve cuántas ventas se liberaron.
+  Future<int> voidPayout(String payoutId, String reason) async {
+    final res = await functions.httpsCallable('voidPayout').call<Map<String, dynamic>>({'payoutId': payoutId, 'reason': reason});
+    return (res.data['orderCount'] as num?)?.toInt() ?? 0;
+  }
+
   Future<int> createPayout(String storeId, String note) async {
     final res = await functions.httpsCallable('createPayout').call<Map<String, dynamic>>({'storeId': storeId, 'note': note});
     return (res.data['storeAmount'] as num).toInt();
@@ -162,7 +169,8 @@ class Repository {
   }
 
   /// Un comercio rechazado corrige sus datos y vuelve a quedar pendiente.
-  Future<void> resubmitStore(String storeId) => _stores.doc(storeId).update({
+  Future<void> resubmitStore(String storeId, [Map<String, Object?> data = const {}]) => _stores.doc(storeId).update({
+        ...data,
         'status': StoreStatus.pending.value,
         'statusReason': FieldValue.delete(),
       });
@@ -253,6 +261,9 @@ class Repository {
   /// Admin: borra a un inscrito de la lista de espera (derecho a eliminar sus datos).
   Future<void> deleteWaitlistEntry(String id) => _db.collection('waitlist').doc(id).delete();
 
+  /// Total real de inscritos (conteo en el servidor, sin el límite de la lista).
+  Future<int> waitlistCount() async => (await _db.collection('waitlist').count().get()).count ?? 0;
+
   Stream<List<WaitlistEntry>> watchWaitlist() => _db
       .collection('waitlist')
       .orderBy('createdAt', descending: true)
@@ -317,6 +328,7 @@ class Repository {
       'originalPrice': originalPrice,
       'price': price,
       'quantityAvailable': quantity,
+      'quantity': quantity,
       'pickupStart': Timestamp.fromDate(pickupStart),
       'pickupEnd': Timestamp.fromDate(pickupEnd),
       'active': true,
@@ -326,11 +338,23 @@ class Repository {
     return ref.id;
   }
 
-  /// Edita una bolsa publicada. [addUnits] suma al stock (con incremento atómico: no pisa compras en curso).
-  Future<void> updateBag(String bagId, Map<String, Object?> data, {int addUnits = 0}) => _bags.doc(bagId).update({
+  /// Edita una bolsa publicada. [addUnits] sube o baja el stock dentro de una transacción: no pisa compras en
+  /// curso y nunca queda bajo 0.
+  Future<void> updateBag(String bagId, Map<String, Object?> data, {int addUnits = 0}) {
+    final ref = _bags.doc(bagId);
+    if (addUnits == 0) return ref.update(data);
+    return _db.runTransaction((tx) async {
+      final d = (await tx.get(ref)).data() ?? const <String, dynamic>{};
+      final now = (d['quantityAvailable'] as num?)?.toInt() ?? 0;
+      final next = (now + addUnits).clamp(0, 999);
+      final total = (d['quantity'] as num?)?.toInt();
+      tx.update(ref, {
         ...data,
-        if (addUnits > 0) 'quantityAvailable': FieldValue.increment(addUnits),
+        'quantityAvailable': next,
+        if (total != null) 'quantity': (total + next - now).clamp(0, 999),
       });
+    });
+  }
 
   /// true si alguien ya reservó o compró esta bolsa (entonces su horario no se cambia: ya está en sus comprobantes).
   Future<bool> bagHasBuyers(String storeId, String bagId) async {
@@ -434,8 +458,16 @@ class Repository {
 
   /// El comercio valida el código/QR del cliente. Devuelve el nombre de la bolsa retirada.
   /// Valida el código de retiro en el local. Devuelve la bolsa y el monto pagado (para saber qué entregar).
-  Future<({String bagTitle, int amount})> redeemOrder(String code) async {
-    final res = await functions.httpsCallable('redeemOrder').call<Map<String, dynamic>>({'code': code});
+  /// Valida el retiro. Si el cliente llegó antes del horario lanza [RedeemTooEarly]; con [force] se entrega igual.
+  Future<({String bagTitle, int amount})> redeemOrder(String code, {bool force = false}) async {
+    final HttpsCallableResult<Map<String, dynamic>> res;
+    try {
+      res = await functions.httpsCallable('redeemOrder').call<Map<String, dynamic>>({'code': code, if (force) 'force': true});
+    } on FirebaseFunctionsException catch (e) {
+      final d = e.details;
+      if (d is Map && d['early'] == true) throw RedeemTooEarly(from: '${d['from']}', bagTitle: '${d['bagTitle']}');
+      rethrow;
+    }
     return (bagTitle: res.data['bagTitle'] as String, amount: (res.data['amount'] as num?)?.toInt() ?? 0);
   }
 
@@ -468,4 +500,13 @@ class Repository {
       .orderBy('pickupEnd')
       .snapshots()
       .map((s) => s.docs.map(BagOrder.fromDoc).toList());
+}
+
+/// El cliente llegó antes del horario de retiro: el local decide si entrega igual.
+class RedeemTooEarly implements Exception {
+  const RedeemTooEarly({required this.from, required this.bagTitle});
+
+  /// Hora de inicio del retiro ("19:00").
+  final String from;
+  final String bagTitle;
 }

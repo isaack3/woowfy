@@ -14,6 +14,7 @@ class Bag {
     required this.originalPrice,
     required this.price,
     required this.quantityAvailable,
+    this.quantity,
     required this.pickupStart,
     required this.pickupEnd,
     required this.active,
@@ -38,6 +39,9 @@ class Bag {
   final int originalPrice;
   final int price;
   final int quantityAvailable;
+
+  /// Cuántas se publicaron (para "publicar igual que ayer"); null en bolsas antiguas.
+  final int? quantity;
   final DateTime pickupStart;
   final DateTime pickupEnd;
   final bool active;
@@ -76,6 +80,7 @@ class Bag {
       originalPrice: (d['originalPrice'] as num).toInt(),
       price: (d['price'] as num).toInt(),
       quantityAvailable: (d['quantityAvailable'] as num?)?.toInt() ?? 0,
+      quantity: (d['quantity'] as num?)?.toInt(),
       pickupStart: (d['pickupStart'] as Timestamp).toDate(),
       pickupEnd: (d['pickupEnd'] as Timestamp).toDate(),
       active: d['active'] as bool? ?? false,
@@ -491,6 +496,9 @@ const platformFeeRate = 0.25;
 String get platformFeePercent => '${(platformFeeRate * 100).round()}%';
 String get storeSharePercent => '${100 - (platformFeeRate * 100).round()}%';
 
+/// Precio mínimo de una bolsa (lo promete la guía para comercios). Igual que en firestore.rules.
+const minBagPrice = 500;
+
 /// Lo que recibe el local por una venta de [price] (misma cuenta que el servidor).
 int storeShareOf(int price) => price - (price * platformFeeRate).round();
 
@@ -504,6 +512,9 @@ const noShowGraceMinutes = 60;
 String get ruleHold => 'Te la guardamos $paymentTimeoutMinutes min mientras pagas.';
 String get ruleCancel =>
     'Puedes cancelar con reembolso hasta $cancelHoursBefore h antes del retiro, o en los $cancelGraceMinutes min después de pagar.';
+/// Llegar dentro del horario: antes, el local puede no tener la bolsa lista.
+const rulePickupWindow = 'Llega dentro del horario de retiro: antes, el local aún puede estar armando tu bolsa.';
+
 String get ruleNoShow =>
     'Si no la retiras hasta ${noShowGraceMinutes ~/ 60} h después del horario, no hay reembolso: el local ya te la apartó.';
 
@@ -550,11 +561,18 @@ class Payout {
     this.storeId = '',
     this.storeName = '',
     this.destination,
+    this.voidedAt,
+    this.voidReason = '',
   });
 
   final String id;
   final String storeId;
   final String storeName;
+
+  /// Anulada por el admin (sus ventas volvieron a "por pagar").
+  final DateTime? voidedAt;
+  final String voidReason;
+  bool get voided => voidedAt != null;
 
   /// Cuenta a la que se pagó, guardada al liquidar (las liquidaciones antiguas no la tienen).
   final BankAccount? destination;
@@ -578,6 +596,8 @@ class Payout {
       storeId: d['storeId'] as String? ?? '',
       storeName: d['storeName'] as String? ?? '',
       destination: d['destination'] is Map ? BankAccount.fromMap(Map<String, dynamic>.from(d['destination'] as Map)) : null,
+      voidedAt: (d['voidedAt'] as Timestamp?)?.toDate(),
+      voidReason: d['voidReason'] as String? ?? '',
     );
   }
 }

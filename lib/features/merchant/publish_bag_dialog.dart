@@ -74,8 +74,8 @@ class _PublishBagDialogState extends State<PublishBagDialog> {
       _price.text = _money(b.price);
       _start = TimeOfDay.fromDateTime(b.pickupStart);
       _end = TimeOfDay.fromDateTime(b.pickupEnd);
-      // Al editar, la cantidad es "unidades a sumar"; al repetir, la misma de la vez anterior no se conoce: 3.
-      _quantity.text = widget.editBag != null ? '0' : '3';
+      // Al editar, lo que queda hoy (se puede subir o bajar); al repetir, lo que se publicó la última vez.
+      _quantity.text = widget.editBag != null ? '${b.quantityAvailable}' : '${b.quantity ?? 3}';
     }
     final edit = widget.editBag;
     if (edit != null) {
@@ -109,6 +109,12 @@ class _PublishBagDialogState extends State<PublishBagDialog> {
       c.dispose();
     }
     super.dispose();
+  }
+
+  /// Botones − / + de la cantidad.
+  void _step(int delta, {required int min}) {
+    final next = ((_amount(_quantity.text) ?? 0) + delta).clamp(min, 999);
+    _quantity.text = '$next';
   }
 
   DateTime _today(TimeOfDay t) {
@@ -159,7 +165,7 @@ class _PublishBagDialogState extends State<PublishBagDialog> {
             if (!_timesLocked) 'pickupEnd': Timestamp.fromDate(_onDay(editBag.pickupEnd, _end)),
             'imageUrl': ?imageUrl,
           },
-          addUnits: _amount(_quantity.text) ?? 0,
+          addUnits: (_amount(_quantity.text) ?? editBag.quantityAvailable) - editBag.quantityAvailable,
         );
         if (mounted) Navigator.of(context).pop();
       });
@@ -249,7 +255,8 @@ class _PublishBagDialogState extends State<PublishBagDialog> {
   @override
   Widget build(BuildContext context) {
     String? positiveInt(String? v) => (_amount(v) ?? 0) > 0 ? null : 'Ingresa un número mayor a 0';
-    String? nonNegative(String? v) => _amount(v) != null ? null : 'Ingresa un número (0 si no sumas)';
+    String? nonNegative(String? v) => _amount(v) != null ? null : 'Ingresa un número (0 para agotarla)';
+    String? offer(String? v) => (_amount(v) ?? 0) >= minBagPrice ? null : 'El precio mínimo es ${formatClp(minBagPrice)}';
     final digits = [FilteringTextInputFormatter.digitsOnly];
     final money = [_ThousandsFormatter()];
     return AlertDialog(
@@ -307,7 +314,7 @@ class _PublishBagDialogState extends State<PublishBagDialog> {
                         keyboardType: TextInputType.number,
                         inputFormatters: money,
                         decoration: const InputDecoration(labelText: 'Oferta', prefixText: '\$ '),
-                        validator: positiveInt,
+                        validator: offer,
                       ),
                     ),
                   ],
@@ -337,9 +344,22 @@ class _PublishBagDialogState extends State<PublishBagDialog> {
                   controller: _quantity,
                   keyboardType: TextInputType.number,
                   inputFormatters: digits,
+                  textAlign: TextAlign.center,
                   decoration: InputDecoration(
-                    labelText: widget.editBag != null ? 'Sumar unidades' : 'Cantidad de bolsas',
-                    helperText: widget.editBag != null ? 'Hoy quedan ${widget.editBag!.quantityAvailable}. Deja 0 si no sumas.' : null,
+                    labelText: widget.editBag != null ? 'Quedan hoy' : 'Cantidad de bolsas',
+                    helperText: widget.editBag != null
+                        ? 'Súbela o bájala. Si alguien compra mientras editas, se descuenta igual.'
+                        : null,
+                    prefixIcon: IconButton(
+                      tooltip: 'Una menos',
+                      icon: const Icon(Icons.remove),
+                      onPressed: () => _step(-1, min: widget.editBag != null ? 0 : 1),
+                    ),
+                    suffixIcon: IconButton(
+                      tooltip: 'Una más',
+                      icon: const Icon(Icons.add),
+                      onPressed: () => _step(1, min: 0),
+                    ),
                   ),
                   validator: widget.editBag != null ? nonNegative : positiveInt,
                 ),

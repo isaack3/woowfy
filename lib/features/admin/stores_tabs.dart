@@ -359,7 +359,7 @@ class _PayoutDialogState extends State<PayoutDialog> {
                                   'hasta que la agregue en "Ventas y pagos".',
                             )
                           else ...[
-                            const Text('Transfiere a esta cuenta y registra el pago aquí:'),
+                            const Text('Primero transfiere a esta cuenta; después registra el pago aquí:'),
                             const SizedBox(height: 8),
                             _BankDetails(bank: bank, amount: toPay),
                             const SizedBox(height: 12),
@@ -672,7 +672,8 @@ class _PayAllDialogState extends State<_PayAllDialog> {
                 decoration: const InputDecoration(labelText: 'Nota (p. ej. transferencias semana 40)'),
               ),
               const SizedBox(height: 8),
-              Text('Copia la planilla para las transferencias del banco. Al registrar, estas ventas quedan como pagadas.',
+              Text('Copia la planilla, haz las transferencias en el banco y después registra: estas ventas quedan como pagadas. '
+                  'Si algo falla, puedes anular una liquidación desde el historial.',
                   style: t.bodySmall),
             ],
           ]),

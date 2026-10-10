@@ -208,6 +208,8 @@
   .wq-res[hidden]{display:none}
   .wq-ok{background:#063B25;color:#FFF7E3}
   .wq-bad{background:#B83A22;color:#fff}
+  .wq-warn{background:#F5B53D;color:#3A2600}
+  .wq-warn .wq-btn.wq-line{background:transparent;border:2px solid #3A2600;color:#3A2600}
   .wq-res .wq-icon{font-size:64px;line-height:1}
   .wq-res h2{margin:0;font-size:28px;font-weight:900;line-height:1.15}
   .wq-res p{margin:0;font-size:18px;line-height:1.4}
@@ -292,6 +294,11 @@
           <div class="wq-res wq-bad" data-m="bad" hidden role="alert">
             <div class="wq-icon" aria-hidden="true">✋</div><h2 data-title></h2><p data-detail></p>
             <button type="button" class="wq-btn wq-white" data-a="next">Entendido, escanear otro</button></div>
+          <div class="wq-res wq-warn" data-m="warn" hidden role="alert">
+            <div class="wq-icon" aria-hidden="true">⏰</div><h2 data-title></h2><p data-detail></p>
+            <p>Entrégala solo si ya está lista.</p>
+            <button type="button" class="wq-btn wq-lime" data-a="force">Entregar igual</button>
+            <button type="button" class="wq-btn wq-line" data-a="next">No entregar, siguiente</button></div>
         </div>`;
       document.body.appendChild(root);
 
@@ -303,6 +310,8 @@
       const errorBox = root.querySelector('[data-m=error]');
       const okBox = root.querySelector('[data-m=ok]');
       const badBox = root.querySelector('[data-m=bad]');
+      const warnBox = root.querySelector('[data-m=warn]');
+      let earlyCode = null;
       const manual = root.querySelector('[data-manual]');
       const countEl = root.querySelector('[data-count]');
       const canvas = document.createElement('canvas');
@@ -340,11 +349,13 @@
         clearTimeout(nextTimer);
         okBox.hidden = true;
         badBox.hidden = true;
+        warnBox.hidden = true;
+        earlyCode = null;
         paused = false;
       }
       function onKey(e) {
         if (e.key === 'Escape') finish();
-        if (e.key === 'Enter' && (!okBox.hidden || !badBox.hidden)) resume();
+        if (e.key === 'Enter' && (!okBox.hidden || !badBox.hidden || !warnBox.hidden)) resume();
       }
       document.addEventListener('keydown', onKey);
       root.addEventListener('click', (e) => {
@@ -354,6 +365,7 @@
         if (a.dataset.a === 'close') finish();
         if (a.dataset.a === 'retry') start();
         if (a.dataset.a === 'next') resume();
+        if (a.dataset.a === 'force' && earlyCode) { const c = earlyCode; warnBox.hidden = true; earlyCode = null; check(c, true); }
         if (a.dataset.a === 'type') {
           errorBox.hidden = true;
           manual.hidden = false;
@@ -371,20 +383,21 @@
         check(code);
       });
 
-      async function check(code) {
+      async function check(code, force) {
         paused = true;
         loading.querySelector('[data-lt]').textContent = 'Validando ' + code + '…';
         loading.hidden = false;
         let r;
         try {
-          r = await validate(code);
+          r = await validate(code, !!force);
         } catch (err) {
           r = { ok: false, title: 'No se pudo validar', detail: 'Revisa tu conexión e intenta de nuevo.', retry: true };
         }
         loading.hidden = true;
         loading.querySelector('[data-lt]').textContent = 'Abriendo la cámara…';
         if (done) return;
-        const box = r && r.ok ? okBox : badBox;
+        const box = r && r.ok ? okBox : r && r.early ? warnBox : badBox;
+        if (r && r.early) earlyCode = code;
         box.querySelector('[data-title]').textContent = (r && r.title) || '';
         box.querySelector('[data-detail]').textContent = (r && r.detail) || '';
         // Error de conexión: el mismo QR se puede volver a leer apenas se toque "Entendido".
@@ -401,7 +414,7 @@
           navigator.vibrate([150, 90, 150]);
         }
         box.hidden = false;
-        box.querySelector('[data-a=next]').focus();
+        box.querySelector(r && r.early ? '[data-a=force]' : '[data-a=next]').focus();
       }
 
       function accept(raw) {

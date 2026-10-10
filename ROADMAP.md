@@ -1,7 +1,7 @@
 # Woowfy — Hoja de ruta
 
 Marketplace de bolsas sorpresa contra el desperdicio de comida. Chile primero, luego Latam.
-Marca las casillas a medida que avancemos. Última actualización: 10-10-2026 (ronda 8, tanda 2).
+Marca las casillas a medida que avancemos. Última actualización: 10-10-2026 (ronda 8, tanda 3).
 
 **En línea:** [woowfy.com](https://woowfy.com) (landing) · [app.woowfy.com](https://app.woowfy.com) (app)
 
@@ -250,6 +250,15 @@ Puntajes (heurísticas de Nielsen): Home 22/40 · flujo cliente 22/40 · comerci
 - [x] Pedido pagado: "¡Es tuya!" con lo pagado y lo ahorrado, "Cómo llegar" bajo el horario y ayuda con el pedido ya identificado (hola@passva.com)
 - [x] Esperando pago: "Confirmando tu pago…" se revisa solo cada 15 s durante 1 minuto; cancelar queda abajo y discreto
 
+**Ronda 8, tanda 3 — comercio y admin ✅** (desplegada el 10-10)
+- [x] Local rechazado: ve el motivo y corrige sus datos en el mismo formulario antes de reenviar
+- [x] Stock que sube y baja ("Quedan hoy" con − / +, en una transacción, nunca bajo 0); "igual que ayer" usa la cantidad de la última vez
+- [x] Hora de retiro (desde 30 min antes): el botón flotante es "Validar retiro" y "Publicar" pasa a uno chico
+- [x] Cliente temprano: el mostrador avisa en ámbar "Aún no es hora" con "Entregar igual"; al cliente se le pide llegar dentro del horario (antes de pagar, en el comprobante y en el correo)
+- [x] Precio mínimo $500 en el formulario y en las reglas (bolsas y recurrentes)
+- [x] Anular una liquidación (función voidPayout): sus ventas vuelven a "por pagar"; textos de "primero transfiere, después registra"
+- [x] Aviso "en construcción · Lanzar" arriba de todo el admin; Ventas y Analítica parten en 7 días; la analítica no pasa de 100%
+
 ### Próximo (por decidir)
 - [ ] Empleados por local, reclamos y moderación de opiniones, invitar amigos (referidos)
 
@@ -270,6 +279,7 @@ Puntajes (heurísticas de Nielsen): Home 22/40 · flujo cliente 22/40 · comerci
       SpA y los valores en amarillo (2 reservas, 25%, pago semanal)
 - [ ] 💰 **Alerta de presupuesto** en Google Cloud Billing (ej. USD 10)
 - [ ] ↪️ Redirección 301 `www.woowfy.com` → `woowfy.com` (consola → Hosting → sitio woowfy-app → editar dominio)
+- [x] `firebase functions:secrets:prune` (hecho el 10-10)
 - [ ] Personalizar la plantilla del correo "recuperar contraseña" (Authentication → Plantillas)
 - [ ] Correo de lanzamiento a la lista de espera (exportar CSV desde Admin → Interesados)
 - [ ] Pedir al diseñador un brand kit con el isotipo centrado (el v2 viene cortado)

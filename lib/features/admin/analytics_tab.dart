@@ -297,7 +297,7 @@ class _Funnel extends StatelessWidget {
                     child: Text(
                       i == 0 || steps[i - 1].$2 == 0
                           ? '${steps[i].$2}'
-                          : '${steps[i].$2} · ${(steps[i].$2 * 100 / steps[i - 1].$2).round()}%',
+                          : '${steps[i].$2} · ${math.min(100, (steps[i].$2 * 100 / steps[i - 1].$2).round())}%',
                       textAlign: TextAlign.right,
                       style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
                     ),

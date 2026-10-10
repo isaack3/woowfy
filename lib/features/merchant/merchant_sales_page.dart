@@ -275,7 +275,7 @@ class _Payouts extends StatelessWidget {
     return Reloadable(builder: (context) => StreamBuilder<List<Payout>>(
       stream: Repository.instance.watchPayouts(storeId),
       builder: (context, snap) {
-        final payouts = snap.data ?? const <Payout>[];
+        final payouts = (snap.data ?? const <Payout>[]).where((p) => !p.voided).toList();
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

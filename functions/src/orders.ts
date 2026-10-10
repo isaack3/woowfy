@@ -380,6 +380,13 @@ export const redeemOrder = onCall(async (req) => {
   if (order.pickupEnd.toMillis() + REDEEM_GRACE_MINUTES * 60_000 < now) {
     throw new HttpsError("failed-precondition", "El horario de retiro de este pedido ya terminó.");
   }
+  // Llegó antes de la hora: se avisa al local, que decide si la bolsa ya está lista ("Entregar igual").
+  if (req.data?.force !== true && order.pickupStart.toMillis() > now) {
+    const from = new Intl.DateTimeFormat("es-CL", { timeZone: "America/Santiago", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+      .format(order.pickupStart.toDate());
+    throw new HttpsError("failed-precondition", `Aún no es hora: el retiro es desde las ${from}.`,
+      { early: true, from, bagTitle: order.bagTitle });
+  }
 
   await db.runTransaction(async (tx) => {
     const fresh = (await tx.get(doc.ref)).data();

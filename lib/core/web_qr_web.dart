@@ -9,7 +9,8 @@ external JSPromise<JSAny?> _counter(JSObject options);
 
 /// Resultado de validar un código en el modo mostrador.
 /// [retry]: el problema fue de conexión, así que el mismo QR se puede volver a leer de inmediato.
-typedef CounterResult = ({bool ok, String title, String detail, bool retry});
+/// [early]: llegó antes del horario; el local puede entregar igual (se vuelve a validar con force).
+typedef CounterResult = ({bool ok, String title, String detail, bool retry, bool early});
 
 /// Escáner de QR de web/qr_scanner.js: una capa HTML sobre la app que funciona en Safari de iPhone.
 class WebQr {
@@ -26,13 +27,13 @@ class WebQr {
 
   /// Modo mostrador: cámara abierta y un cliente tras otro hasta que el comercio sale. [validate] llama al servidor.
   /// Devuelve false si el escáner no está disponible (p. ej. caché vieja sin el script nuevo).
-  static Future<bool> counter({int? pending, required Future<CounterResult> Function(String code) validate}) async {
+  static Future<bool> counter({int? pending, required Future<CounterResult> Function(String code, bool force) validate}) async {
     final options = JSObject();
     if (pending != null) options.setProperty('pending'.toJS, pending.toJS);
     options.setProperty(
       'validate'.toJS,
-      ((JSString code) => validate(code.toDart)
-          .then((r) => {'ok': r.ok, 'title': r.title, 'detail': r.detail, 'retry': r.retry}.jsify())
+      ((JSString code, JSBoolean? force) => validate(code.toDart, force?.toDart ?? false)
+          .then((r) => {'ok': r.ok, 'title': r.title, 'detail': r.detail, 'retry': r.retry, 'early': r.early}.jsify())
           .toJS).toJS,
     );
     try {

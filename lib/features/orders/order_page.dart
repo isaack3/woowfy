@@ -116,6 +116,12 @@ class _Body extends StatelessWidget {
             _PickupCode(order: order),
             const SizedBox(height: 8),
             Text(pickup, textAlign: TextAlign.center, style: t.titleMedium),
+            if (DateTime.now().isBefore(order.pickupStart))
+              Text(
+                'Llega desde las ${formatTime(order.pickupStart)}: antes, tu bolsa puede no estar lista.',
+                textAlign: TextAlign.center,
+                style: t.bodySmall?.copyWith(color: WoowfyColors.muted),
+              ),
             _HowToGet(order: order),
             const SizedBox(height: 16),
             if (canCancel) ...[

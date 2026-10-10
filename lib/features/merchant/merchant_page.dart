@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -39,6 +41,8 @@ class MerchantPage extends StatelessWidget {
           final Widget child;
           if (store == null) {
             child = _StoreRequestForm(uid: uid);
+          } else if (store.status == StoreStatus.rejected) {
+            child = _StoreRequestForm(uid: uid, rejected: store);
           } else if (store.status == StoreStatus.pending) {
             child = _PendingChecklist(store: store);
           } else if (!store.approved) {
@@ -159,13 +163,6 @@ class _StatusMessage extends StatelessWidget {
             const SizedBox(height: 8),
             Text('Motivo: ${store.statusReason}', textAlign: TextAlign.center),
           ],
-          if (store.status == StoreStatus.rejected) ...[
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: () => Repository.instance.resubmitStore(store.id),
-              child: const Text('Ya lo corregí, enviar de nuevo'),
-            ),
-          ],
           if (store.status == StoreStatus.suspended) ...[
             const SizedBox(height: 16),
             const Text('Escríbenos a hola@passva.com para más información.'),
@@ -191,10 +188,12 @@ class _StatusMessage extends StatelessWidget {
   }
 }
 
+/// Solicitud de alta. Con [rejected], la misma solicitud con sus datos para corregirla y reenviarla.
 class _StoreRequestForm extends StatefulWidget {
-  const _StoreRequestForm({required this.uid});
+  const _StoreRequestForm({required this.uid, this.rejected});
 
   final String uid;
+  final Store? rejected;
 
   @override
   State<_StoreRequestForm> createState() => _StoreRequestFormState();
@@ -202,12 +201,13 @@ class _StoreRequestForm extends StatefulWidget {
 
 class _StoreRequestFormState extends State<_StoreRequestForm> {
   final _form = GlobalKey<FormState>();
-  final _name = TextEditingController();
-  final _address = TextEditingController();
-  final _phone = TextEditingController();
-  final _comuna = TextEditingController();
-  String? _region;
-  String? _category;
+  late final _name = TextEditingController(text: widget.rejected?.name);
+  late final _address = TextEditingController(text: widget.rejected?.address);
+  late final _phone = TextEditingController(text: widget.rejected?.phone);
+  late final _comuna = TextEditingController(text: widget.rejected?.comuna);
+  late String? _region = chileRegions.contains(widget.rejected?.region) ? widget.rejected!.region : null;
+  late String? _category =
+      storeCategories.contains(widget.rejected?.category) ? widget.rejected!.category : null;
   bool _sending = false;
 
   @override
@@ -223,6 +223,18 @@ class _StoreRequestFormState extends State<_StoreRequestForm> {
     if (!_form.currentState!.validate()) return;
     setState(() => _sending = true);
     try {
+      final rejected = widget.rejected;
+      if (rejected != null) {
+        await Repository.instance.resubmitStore(rejected.id, {
+          'name': _name.text.trim(),
+          'phone': _phone.text.trim(),
+          'region': _region!,
+          'comuna': _comuna.text.trim(),
+          'address': _address.text.trim(),
+          'category': _category,
+        });
+        return;
+      }
       await Repository.instance.requestStore(
         uid: widget.uid,
         name: _name.text.trim(),
@@ -251,9 +263,25 @@ class _StoreRequestFormState extends State<_StoreRequestForm> {
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          Text('Suma tu local a Woowfy', style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 8),
-          const Text('Vende lo que no alcanzaste a vender hoy y llega a clientes nuevos.'),
+          if (widget.rejected != null)
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(color: WoowfyColors.orangeSoft, borderRadius: BorderRadius.circular(16)),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Tu solicitud no fue aprobada', style: Theme.of(context).textTheme.titleMedium),
+                if (widget.rejected!.statusReason != null) ...[
+                  const SizedBox(height: 4),
+                  Text('Motivo: ${widget.rejected!.statusReason}'),
+                ],
+                const SizedBox(height: 4),
+                const Text('Corrige tus datos y envíala de nuevo. Si tienes dudas, escríbenos a hola@passva.com.'),
+              ]),
+            )
+          else ...[
+            Text('Suma tu local a Woowfy', style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 8),
+            const Text('Vende lo que no alcanzaste a vender hoy y llega a clientes nuevos.'),
+          ],
           const SizedBox(height: 24),
           TextFormField(
             controller: _name,
@@ -299,7 +327,11 @@ class _StoreRequestFormState extends State<_StoreRequestForm> {
           const SizedBox(height: 24),
           FilledButton(
             onPressed: _sending ? null : _send,
-            child: Text(_sending ? 'Enviando…' : 'Enviar solicitud'),
+            child: Text(_sending
+                ? 'Enviando…'
+                : widget.rejected != null
+                    ? 'Guardar y enviar de nuevo'
+                    : 'Enviar solicitud'),
           ),
           const SizedBox(height: 12),
           const LegalNotice(prefix: 'Al enviar la solicitud aceptas'),
@@ -326,11 +358,7 @@ class _Dashboard extends StatelessWidget {
         // "Igual que ayer": la bolsa publicada más reciente.
         final latest = bags.isEmpty ? null : bags.first;
         return Scaffold(
-          floatingActionButton: FloatingActionButton.extended(
-            onPressed: () => publishBag(context, store, from: latest),
-            icon: const Icon(Icons.add),
-            label: const Text('Publicar bolsa'),
-          ),
+          floatingActionButton: _MainAction(store: store, current: current, latest: latest),
           body: snap.hasError
               ? ErrorRetry(title: 'No pudimos cargar tus bolsas', error: snap.error)
               : !snap.hasData
@@ -380,6 +408,65 @@ class _Dashboard extends StatelessWidget {
         );
       },
     ));
+  }
+}
+
+/// Botón flotante: "Publicar bolsa", salvo en hora de retiro (desde 30 min antes hasta que termina), cuando el
+/// pulgar necesita "Validar retiro" y publicar pasa a un botón chico al lado.
+class _MainAction extends StatefulWidget {
+  const _MainAction({required this.store, required this.current, required this.latest});
+
+  final Store store;
+  final List<Bag> current;
+  final Bag? latest;
+
+  @override
+  State<_MainAction> createState() => _MainActionState();
+}
+
+class _MainActionState extends State<_MainAction> {
+  // Cambia solo con la hora, sin que nadie toque nada.
+  late final Timer _tick = Timer.periodic(const Duration(minutes: 1), (_) => setState(() {}));
+
+  @override
+  void dispose() {
+    _tick.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final rush = widget.current.any(
+        (b) => now.isAfter(b.pickupStart.subtract(const Duration(minutes: 30))) && now.isBefore(b.pickupEnd));
+    void publish() => publishBag(context, widget.store, from: widget.latest);
+    if (!rush) {
+      return FloatingActionButton.extended(
+        heroTag: 'publish',
+        onPressed: publish,
+        icon: const Icon(Icons.add),
+        label: const Text('Publicar bolsa'),
+      );
+    }
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      FloatingActionButton.small(
+        heroTag: 'publish',
+        tooltip: 'Publicar bolsa',
+        backgroundColor: WoowfyColors.cream,
+        foregroundColor: WoowfyColors.green,
+        onPressed: publish,
+        child: const Icon(Icons.add),
+      ),
+      const SizedBox(width: 12),
+      FloatingActionButton.extended(
+        heroTag: 'redeem',
+        backgroundColor: WoowfyColors.green,
+        foregroundColor: WoowfyColors.cream,
+        onPressed: () => openCounter(context),
+        icon: const Icon(Icons.qr_code_scanner),
+        label: const Text('Validar retiro'),
+      ),
+    ]);
   }
 }
 

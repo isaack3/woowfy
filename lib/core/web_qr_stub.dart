@@ -1,6 +1,7 @@
 /// Resultado de validar un código en el modo mostrador.
 /// [retry]: el problema fue de conexión, así que el mismo QR se puede volver a leer de inmediato.
-typedef CounterResult = ({bool ok, String title, String detail, bool retry});
+/// [early]: llegó antes del horario; el local puede entregar igual (se vuelve a validar con force).
+typedef CounterResult = ({bool ok, String title, String detail, bool retry, bool early});
 
 /// Fuera de la web se usa QrScannerPage (mobile_scanner nativo).
 class WebQr {
@@ -8,6 +9,6 @@ class WebQr {
 
   static Future<String?> scan() async => null;
 
-  static Future<bool> counter({int? pending, required Future<CounterResult> Function(String code) validate}) async =>
+  static Future<bool> counter({int? pending, required Future<CounterResult> Function(String code, bool force) validate}) async =>
       false;
 }

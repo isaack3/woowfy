@@ -157,6 +157,7 @@ function purchaseEmail(o: OrderMail) {
         row("Pagaste", clp(o.amount)),
       ) +
       p(`<span style="font-size:14px;color:#4E5A53">Si no puedes ir, cancela desde la app hasta el ${escape(chileDate.format(limit))} a las ${chileTime.format(limit)} y te devolvemos el 100%. ` +
+        "Llega dentro del horario: antes, tu bolsa puede no estar lista. " +
         "Si no retiras dentro del horario, no hay reembolso: el local la apartó para ti.</span>"),
     cta: { label: "Ver mi pedido y el QR", url: `${APP_URL}/order/${o.id}` },
     footer: ORDER_FOOTER,

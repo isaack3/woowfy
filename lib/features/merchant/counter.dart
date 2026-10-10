@@ -17,10 +17,12 @@ Future<void> openCounter(BuildContext context, {int? pending}) async {
   if (context.mounted) await showDialog<void>(context: context, builder: (_) => const RedeemDialog());
 }
 
-Future<CounterResult> _validate(String code) async {
+Future<CounterResult> _validate(String code, bool force) async {
   try {
-    final r = await Repository.instance.redeemOrder(code);
-    return (ok: true, title: '1 × ${r.bagTitle}', detail: 'El cliente ya pagó ${formatClp(r.amount)} en línea', retry: false);
+    final r = await Repository.instance.redeemOrder(code, force: force);
+    return (ok: true, title: '1 × ${r.bagTitle}', detail: 'El cliente ya pagó ${formatClp(r.amount)} en línea', retry: false, early: false);
+  } on RedeemTooEarly catch (e) {
+    return (ok: false, title: 'Aún no es hora', detail: 'Retiro desde las ${e.from} · 1 × ${e.bagTitle}', retry: false, early: true);
   } catch (e) {
     // Código inválido, ya retirado o fuera de horario: hay que frenar la entrega. Lo demás es conexión.
     final stop = e is FirebaseFunctionsException &&
@@ -30,6 +32,7 @@ Future<CounterResult> _validate(String code) async {
       title: stop ? 'No entregues' : 'No se pudo validar',
       detail: friendlyError(e, fallback: 'Revisa tu conexión e intenta de nuevo.'),
       retry: !stop,
+      early: false,
     );
   }
 }
