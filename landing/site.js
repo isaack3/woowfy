@@ -4,7 +4,20 @@
 (function () {
   const KEY = 'woowfy.launched';
   const root = document.documentElement;
-  const apply = (launched) => root.classList.toggle('launched', launched);
+  // Antes del lanzamiento la lista de espera va justo bajo el hero (así está en el HTML); ya lanzada, al final.
+  // Se mueve el nodo (no solo el orden visual) para que teclado y lectores de pantalla sigan el mismo orden.
+  const place = (launched) => {
+    const w = document.getElementById('waitlist');
+    const hero = document.querySelector('main > .hero');
+    if (!w || !hero) return;
+    if (launched) w.parentNode.appendChild(w);
+    else hero.after(w);
+  };
+  const apply = (launched) => {
+    root.classList.toggle('launched', launched);
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => place(launched), { once: true });
+    else place(launched);
+  };
 
   // Último valor conocido primero, para que no parpadee al recargar.
   try { apply(localStorage.getItem(KEY) === '1'); } catch (e) { /* sin almacenamiento: queda en construcción */ }

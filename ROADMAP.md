@@ -1,7 +1,7 @@
 # Woowfy — Hoja de ruta
 
 Marketplace de bolsas sorpresa contra el desperdicio de comida. Chile primero, luego Latam.
-Marca las casillas a medida que avancemos. Última actualización: 10-10-2026 (ronda 7: admin).
+Marca las casillas a medida que avancemos. Última actualización: 10-10-2026 (ronda 8, tanda 1).
 
 **En línea:** [woowfy.com](https://woowfy.com) (landing) · [app.woowfy.com](https://app.woowfy.com) (app)
 
@@ -233,6 +233,15 @@ Puntajes (heurísticas de Nielsen): Home 22/40 · flujo cliente 22/40 · comerci
 - [x] Aprobar, activar, suspender y rechazar con "Deshacer"
 - [x] Analítica con error legible y Reintentar; insignias del correo de bienvenida con colores de la marca; Correo avisa cambios sin guardar
 - [x] Cada pestaña con su URL (`/admin?tab=pagos`) y ayuda que se puede ocultar
+
+**Tercera crítica (10-10):** Home 25/40 · cliente 28 (Bueno) · comercio 27 · admin 27 · landing 23/32 (Bueno) · detector 8 (todos de marca).
+
+**Ronda 8, tanda 1 — base ✅** (desplegada el 10-10)
+- [x] Lista de espera después del hero en el HTML (orden real para teclado y lectores); ya lanzada, site.js la mueve al final
+- [x] Liquidaciones guardan la cuenta de destino; el historial copia la planilla con esa cuenta (las antiguas avisan que usan la actual)
+- [x] Pantalla de carga con la marca mientras baja la app (antes, 3–5 s en blanco)
+- [x] Semántica de Flutter activada desde el inicio (lectores de pantalla sin botón oculto)
+- [x] Landing sin frases que suponen comercios existentes ("las bolsas vuelan", "los locales cuentan con…")
 
 ### Próximo (por decidir)
 - [ ] Empleados por local, reclamos y moderación de opiniones, invitar amigos (referidos)

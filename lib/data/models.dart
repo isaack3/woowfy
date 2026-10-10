@@ -549,11 +549,15 @@ class Payout {
     this.createdAt,
     this.storeId = '',
     this.storeName = '',
+    this.destination,
   });
 
   final String id;
   final String storeId;
   final String storeName;
+
+  /// Cuenta a la que se pagó, guardada al liquidar (las liquidaciones antiguas no la tienen).
+  final BankAccount? destination;
   final int orderCount;
   final int grossAmount;
   final int platformFee;
@@ -573,6 +577,7 @@ class Payout {
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
       storeId: d['storeId'] as String? ?? '',
       storeName: d['storeName'] as String? ?? '',
+      destination: d['destination'] is Map ? BankAccount.fromMap(Map<String, dynamic>.from(d['destination'] as Map)) : null,
     );
   }
 }

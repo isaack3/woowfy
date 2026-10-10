@@ -25,8 +25,20 @@ async function requireAdmin(uid: string | undefined): Promise<string> {
  * Liquida las ventas pendientes de un local. Todo en una transacción: si dos liquidaciones corren a la vez (doble
  * clic, dos admins), la segunda se reintenta y ya no encuentra pedidos sin liquidar. Devuelve null si no hay nada.
  */
+/** Cuenta de destino tal como estaba al liquidar: el historial no debe cambiar si el local cambia de cuenta. */
+async function bankSnapshot(storeId: string): Promise<Record<string, string> | null> {
+  const d = (await getFirestore().collection("stores").doc(storeId).collection("private").doc("bank").get()).data();
+  if (!d) return null;
+  const pick = (k: string) => (typeof d[k] === "string" ? d[k] : "");
+  return {
+    holder: pick("holder"), rut: pick("rut"), bank: pick("bank"),
+    accountType: pick("accountType"), accountNumber: pick("accountNumber"), email: pick("email"),
+  };
+}
+
 async function payoutStore(storeId: string, storeName: string, note: string, uid: string): Promise<PayoutResult | null> {
   const db = getFirestore();
+  const destination = await bankSnapshot(storeId);
   const payoutRef = db.collection("payouts").doc();
   return db.runTransaction(async (tx) => {
     const payable = await tx.get(db.collection("orders").where("storeId", "==", storeId).where("status", "in", PAYABLE_STATUSES));
@@ -47,6 +59,7 @@ async function payoutStore(storeId: string, storeName: string, note: string, uid
     );
     const dates = pending.map((d) => d.data().pickupStart.toMillis());
     tx.set(payoutRef, {
+      destination,
       storeId,
       storeName,
       orderCount: pending.length,

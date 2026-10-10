@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -16,6 +17,9 @@ import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // En la web, Flutter no expone nada a los lectores de pantalla hasta que alguien toca un botón oculto
+  // ("Enable accessibility"). Lo activamos desde el inicio.
+  if (kIsWeb) SemanticsBinding.instance.ensureSemantics();
   // URLs limpias en web (app.woowfy.com/bag/123 en vez de /#/bag/123).
   usePathUrlStrategy();
   await initializeDateFormatting('es_CL');

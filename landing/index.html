@@ -24,7 +24,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://woowfy.com/og-image.png">
 
-  <script src="/site.js?v=2"></script>
+  <script src="/site.js?v=3"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
@@ -146,11 +146,7 @@
     .qr-mini { width: 44px; height: 44px; }
 
     /* ---------- Cinta ---------- */
-    main { overflow-x: clip; display: flex; flex-direction: column; }
-    main > * { order: 2; }
-    main > .hero { order: 0; }
-    /* Antes del lanzamiento la acción es inscribirse: el formulario queda justo bajo el hero. */
-    html:not(.launched) main > #waitlist { order: 1; }
+    main { overflow-x: clip; }
 
     /* ---------- Secciones ---------- */
     section { padding: 110px 0; }
@@ -381,120 +377,7 @@
       </div>
     </section>
 
-    <section id="how-it-works" aria-labelledby="how-title">
-      <div class="wrap">
-        <div class="section-head center reveal">
-          <h2 id="how-title">Tres pasos y rescatas tu primera bolsa</h2>
-          <p>Cada día los locales publican lo que les sobró. Las bolsas vuelan, así que conviene mirar temprano.</p>
-        </div>
-        <div class="steps">
-          <article class="step reveal">
-            <div class="ico lime"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div>
-            <h3>Elige</h3>
-            <p>Mira las bolsas disponibles hoy cerca de ti, con su precio, descuento y horario de retiro.</p>
-          </article>
-          <article class="step reveal">
-            <div class="ico orange"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h3"/></svg></div>
-            <h3>Paga en línea</h3>
-            <p>Reserva con un toque y paga de forma segura. Tu bolsa queda apartada solo para ti.</p>
-          </article>
-          <article class="step reveal">
-            <div class="ico coral"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v.01M17 21h4v-4"/></svg></div>
-            <h3>Retira con tu QR</h3>
-            <p>Llega al local en el horario indicado, muestra tu código y listo: comida rica, a un precio increíble.</p>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section id="merchants" style="padding-top:0" aria-label="Beneficios">
-      <div class="wrap split">
-        <article class="panel you reveal">
-          <h3>Come rico, gasta menos</h3>
-          <ul>
-            <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9BE52C" stroke-width="2.8"><path d="M20 6 9 17l-5-5"/></svg>Paga la mitad o menos de lo que vale la comida.</li>
-            <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9BE52C" stroke-width="2.8"><path d="M20 6 9 17l-5-5"/></svg>Descubre locales nuevos de tu barrio.</li>
-            <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9BE52C" stroke-width="2.8"><path d="M20 6 9 17l-5-5"/></svg>Sin descargar nada: entra desde el navegador.</li>
-            <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9BE52C" stroke-width="2.8"><path d="M20 6 9 17l-5-5"/></svg>Cada bolsa es comida que no termina en la basura.</li>
-          </ul>
-          <a class="btn btn-lime" href="#waitlist" data-type="cliente" data-prelaunch>Avísame cuando lancen</a>
-          <a class="btn btn-lime" href="https://app.woowfy.com" data-launch>Ver bolsas cerca de mí</a>
-          <svg class="deco" aria-hidden="true"><use href="#mascot"/></svg>
-        </article>
-
-        <article class="panel store reveal">
-          <h3>Convierte lo que sobra en ventas</h3>
-          <ul>
-            <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#063B25" stroke-width="2.8"><path d="M20 6 9 17l-5-5"/></svg><span><strong>Sin mensualidad:</strong> solo pagas una comisión por bolsa vendida.</span></li>
-            <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#063B25" stroke-width="2.8"><path d="M20 6 9 17l-5-5"/></svg><span>Tú decides cuántas bolsas, a qué precio y en qué horario.</span></li>
-            <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#063B25" stroke-width="2.8"><path d="M20 6 9 17l-5-5"/></svg><span>Clientes nuevos que llegan a tu local y vuelven.</span></li>
-            <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#063B25" stroke-width="2.8"><path d="M20 6 9 17l-5-5"/></svg><span>Publicas en un minuto y validas cada retiro con un código.</span></li>
-          </ul>
-          <div style="display:flex;flex-wrap:wrap;gap:12px">
-            <a class="btn btn-primary" href="#waitlist" data-type="comercio" data-prelaunch>Quiero sumar mi local</a>
-            <a class="btn btn-primary" href="https://app.woowfy.com/merchant" data-launch>Sumar mi local</a>
-            <a class="btn btn-ghost" href="/merchants">Ver la guía</a>
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <section class="impact" id="impact" aria-labelledby="impact-title">
-      <div class="wrap">
-        <div class="reveal">
-          <h2 id="impact-title">Un tercio de los alimentos que se producen en el mundo se pierde o se desperdicia</h2>
-          <p>Mucha de esa comida está perfecta para comer: pan del día, pasteles, platos preparados.
-             Woowfy la conecta con personas que la quieren, antes de que se bote.</p>
-          <p class="source">Fuente: FAO, Organización de las Naciones Unidas para la Alimentación y la Agricultura.</p>
-        </div>
-        <div class="ring-list reveal">
-          <div class="ring"><div class="ico lime"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12.5h2M3 10h18"/></svg></div><div><b>Ahorras</b><span>Comida de calidad a una fracción de su precio.</span></div></div>
-          <div class="ring"><div class="ico orange"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9l1.5-5h13L20 9M4 9v11h16V9M4 9h16M9 20v-6h6v6"/></svg></div><div><b>El local gana</b><span>Recupera ingresos de productos que iba a perder.</span></div></div>
-          <div class="ring"><div class="ico coral"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19c0-8 5-13 15-14-1 10-6 15-14 15"/><path d="M5 19c3-4 6-6 9-7"/></svg></div><div><b>El planeta respira</b><span>Menos comida en la basura, menos emisiones.</span></div></div>
-        </div>
-      </div>
-    </section>
-
-    <section id="faq" aria-labelledby="faq-title">
-      <div class="wrap">
-        <div class="section-head center reveal">
-          <h2 id="faq-title">Lo que todos preguntan</h2>
-        </div>
-        <div class="faq">
-          <details class="reveal" data-prelaunch>
-            <summary>¿Cuándo lanzan?</summary>
-            <p>Estamos sumando los primeros locales en Chile. Déjanos tu correo en el formulario y te avisamos apenas abramos.</p>
-          </details>
-          <details class="reveal" data-launch>
-            <summary>¿Hay locales en mi comuna?</summary>
-            <p>Entra a <a href="https://app.woowfy.com">app.woowfy.com</a> y mira el mapa. Si todavía no hay locales cerca, déjanos tu correo más abajo y te avisamos cuando se sume uno.</p>
-          </details>
-          <details class="reveal">
-            <summary>¿Qué trae una bolsa sorpresa?</summary>
-            <p>Depende de lo que el local no alcanzó a vender ese día, por eso es sorpresa. En la descripción de cada bolsa verás qué tipo de productos suele incluir (pan, dulces, platos preparados, etc.).</p>
-          </details>
-          <details class="reveal">
-            <summary>¿La comida está en buen estado?</summary>
-            <p>Sí. Son productos del día o aptos para el consumo que el local no vendió. Los locales cuentan con resolución sanitaria y son responsables de lo que entregan.</p>
-          </details>
-          <details class="reveal">
-            <summary>¿Tengo que descargar una app?</summary>
-            <p>No. Woowfy funciona desde el navegador de tu celular o computador. Si quieres, puedes agregarlo a tu pantalla de inicio para abrirlo como una app.</p>
-          </details>
-          <details class="reveal">
-            <summary>¿Cómo retiro mi bolsa?</summary>
-            <p>Después de pagar recibes un código QR. Vas al local dentro del horario de retiro, lo muestras y el local lo valida al entregarte tu bolsa.</p>
-          </details>
-          <details class="reveal">
-            <summary>Tengo un local, ¿cómo me sumo?</summary>
-            <p data-prelaunch>En el <a href="#waitlist" data-type="comercio">formulario</a> elige "Tengo un local" y déjanos tus datos. Te contactamos para conocer tu local y dejarlo listo para el lanzamiento. Mientras, revisa la <a href="/merchants">guía para comercios</a>.</p>
-            <p data-launch>Crea tu cuenta en <a href="https://app.woowfy.com/merchant">app.woowfy.com</a> y pide el alta de tu local en "Mi local". Te aprobamos normalmente en 1 día hábil. Todo lo que necesitas saber está en la <a href="/merchants">guía para comercios</a>.</p>
-          </details>
-        </div>
-      </div>
-    </section>
-
-    <section id="waitlist" style="padding-top:0" aria-labelledby="waitlist-title">
+    <section id="waitlist" style="padding-top:8px" aria-labelledby="waitlist-title">
       <div class="wrap">
         <div class="waitlist reveal">
           <div>
@@ -562,6 +445,121 @@
         </div>
       </div>
     </section>
+
+    <section id="how-it-works" aria-labelledby="how-title">
+      <div class="wrap">
+        <div class="section-head center reveal">
+          <h2 id="how-title">Tres pasos y rescatas tu primera bolsa</h2>
+          <p>Cada día los locales publican lo que les sobró. Cada bolsa tiene cupos y horario de retiro limitados, así que conviene mirar temprano.</p>
+        </div>
+        <div class="steps">
+          <article class="step reveal">
+            <div class="ico lime"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div>
+            <h3>Elige</h3>
+            <p>Mira las bolsas disponibles hoy cerca de ti, con su precio, descuento y horario de retiro.</p>
+          </article>
+          <article class="step reveal">
+            <div class="ico orange"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h3"/></svg></div>
+            <h3>Paga en línea</h3>
+            <p>Reserva con un toque y paga de forma segura. Tu bolsa queda apartada solo para ti.</p>
+          </article>
+          <article class="step reveal">
+            <div class="ico coral"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v.01M17 21h4v-4"/></svg></div>
+            <h3>Retira con tu QR</h3>
+            <p>Llega al local en el horario indicado, muestra tu código y listo: comida rica, a un precio increíble.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="merchants" style="padding-top:0" aria-label="Beneficios">
+      <div class="wrap split">
+        <article class="panel you reveal">
+          <h3>Come rico, gasta menos</h3>
+          <ul>
+            <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9BE52C" stroke-width="2.8"><path d="M20 6 9 17l-5-5"/></svg>Paga la mitad o menos de lo que vale la comida.</li>
+            <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9BE52C" stroke-width="2.8"><path d="M20 6 9 17l-5-5"/></svg>Descubre locales nuevos de tu barrio.</li>
+            <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9BE52C" stroke-width="2.8"><path d="M20 6 9 17l-5-5"/></svg>Sin descargar nada: entra desde el navegador.</li>
+            <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9BE52C" stroke-width="2.8"><path d="M20 6 9 17l-5-5"/></svg>Cada bolsa es comida que no termina en la basura.</li>
+          </ul>
+          <a class="btn btn-lime" href="#waitlist" data-type="cliente" data-prelaunch>Avísame cuando lancen</a>
+          <a class="btn btn-lime" href="https://app.woowfy.com" data-launch>Ver bolsas cerca de mí</a>
+          <svg class="deco" aria-hidden="true"><use href="#mascot"/></svg>
+        </article>
+
+        <article class="panel store reveal">
+          <h3>Convierte lo que sobra en ventas</h3>
+          <ul>
+            <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#063B25" stroke-width="2.8"><path d="M20 6 9 17l-5-5"/></svg><span><strong>Sin mensualidad:</strong> solo pagas una comisión por bolsa vendida.</span></li>
+            <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#063B25" stroke-width="2.8"><path d="M20 6 9 17l-5-5"/></svg><span>Tú decides cuántas bolsas, a qué precio y en qué horario.</span></li>
+            <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#063B25" stroke-width="2.8"><path d="M20 6 9 17l-5-5"/></svg><span>Clientes nuevos que conocen tu local.</span></li>
+            <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#063B25" stroke-width="2.8"><path d="M20 6 9 17l-5-5"/></svg><span>Publicas en un minuto y validas cada retiro con un código.</span></li>
+          </ul>
+          <div style="display:flex;flex-wrap:wrap;gap:12px">
+            <a class="btn btn-primary" href="#waitlist" data-type="comercio" data-prelaunch>Quiero sumar mi local</a>
+            <a class="btn btn-primary" href="https://app.woowfy.com/merchant" data-launch>Sumar mi local</a>
+            <a class="btn btn-ghost" href="/merchants">Ver la guía</a>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="impact" id="impact" aria-labelledby="impact-title">
+      <div class="wrap">
+        <div class="reveal">
+          <h2 id="impact-title">Un tercio de los alimentos que se producen en el mundo se pierde o se desperdicia</h2>
+          <p>Mucha de esa comida está perfecta para comer: pan del día, pasteles, platos preparados.
+             Woowfy la conecta con personas que la quieren, antes de que se bote.</p>
+          <p class="source">Fuente: FAO, Organización de las Naciones Unidas para la Alimentación y la Agricultura.</p>
+        </div>
+        <div class="ring-list reveal">
+          <div class="ring"><div class="ico lime"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12.5h2M3 10h18"/></svg></div><div><b>Ahorras</b><span>Comida de calidad a una fracción de su precio.</span></div></div>
+          <div class="ring"><div class="ico orange"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9l1.5-5h13L20 9M4 9v11h16V9M4 9h16M9 20v-6h6v6"/></svg></div><div><b>El local gana</b><span>Recupera ingresos de productos que iba a perder.</span></div></div>
+          <div class="ring"><div class="ico coral"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19c0-8 5-13 15-14-1 10-6 15-14 15"/><path d="M5 19c3-4 6-6 9-7"/></svg></div><div><b>El planeta respira</b><span>Menos comida en la basura, menos emisiones.</span></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="faq" aria-labelledby="faq-title">
+      <div class="wrap">
+        <div class="section-head center reveal">
+          <h2 id="faq-title">Lo que todos preguntan</h2>
+        </div>
+        <div class="faq">
+          <details class="reveal" data-prelaunch>
+            <summary>¿Cuándo lanzan?</summary>
+            <p>Estamos sumando los primeros locales en Chile. Déjanos tu correo en el formulario y te avisamos apenas abramos.</p>
+          </details>
+          <details class="reveal" data-launch>
+            <summary>¿Hay locales en mi comuna?</summary>
+            <p>Entra a <a href="https://app.woowfy.com">app.woowfy.com</a> y mira el mapa. Si todavía no hay locales cerca, déjanos tu correo más abajo y te avisamos cuando se sume uno.</p>
+          </details>
+          <details class="reveal">
+            <summary>¿Qué trae una bolsa sorpresa?</summary>
+            <p>Depende de lo que el local no alcanzó a vender ese día, por eso es sorpresa. En la descripción de cada bolsa verás qué tipo de productos suele incluir (pan, dulces, platos preparados, etc.).</p>
+          </details>
+          <details class="reveal">
+            <summary>¿La comida está en buen estado?</summary>
+            <p>Sí. Son productos del día o aptos para el consumo que el local no vendió. Los locales deben contar con resolución sanitaria y son responsables de lo que entregan.</p>
+          </details>
+          <details class="reveal">
+            <summary>¿Tengo que descargar una app?</summary>
+            <p>No. Woowfy funciona desde el navegador de tu celular o computador. Si quieres, puedes agregarlo a tu pantalla de inicio para abrirlo como una app.</p>
+          </details>
+          <details class="reveal">
+            <summary>¿Cómo retiro mi bolsa?</summary>
+            <p>Después de pagar recibes un código QR. Vas al local dentro del horario de retiro, lo muestras y el local lo valida al entregarte tu bolsa.</p>
+          </details>
+          <details class="reveal">
+            <summary>Tengo un local, ¿cómo me sumo?</summary>
+            <p data-prelaunch>En el <a href="#waitlist" data-type="comercio">formulario</a> elige "Tengo un local" y déjanos tus datos. Te contactamos para conocer tu local y dejarlo listo para el lanzamiento. Mientras, revisa la <a href="/merchants">guía para comercios</a>.</p>
+            <p data-launch>Crea tu cuenta en <a href="https://app.woowfy.com/merchant">app.woowfy.com</a> y pide el alta de tu local en "Mi local". Te aprobamos normalmente en 1 día hábil. Todo lo que necesitas saber está en la <a href="/merchants">guía para comercios</a>.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+
   </main>
 
   <footer>

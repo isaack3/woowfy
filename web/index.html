@@ -19,8 +19,35 @@
 
   <title>Woowfy · Rescata comida y ahorra</title>
   <link rel="manifest" href="manifest.json">
+  <!-- Pantalla de carga: se ve mientras baja Flutter (con 3G pueden ser varios segundos) y se quita en su primer cuadro. -->
+  <style>
+    html, body { background: #FFF7E3; margin: 0; }
+    #splash { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 16px; background: #FFF7E3; color: #063B25; font: 700 16px/1.4 Lato, system-ui, sans-serif; z-index: 1;
+      transition: opacity .25s ease; }
+    #splash img { width: 88px; height: 88px; border-radius: 22px; }
+    #splash .dots { display: flex; gap: 6px; }
+    #splash .dots i { width: 8px; height: 8px; border-radius: 50%; background: #9BE52C; animation: wsp 1.2s ease-in-out infinite; }
+    #splash .dots i:nth-child(2) { animation-delay: .15s; }
+    #splash .dots i:nth-child(3) { animation-delay: .3s; }
+    @keyframes wsp { 50% { transform: translateY(-6px); opacity: .5; } }
+    @media (prefers-reduced-motion: reduce) { #splash .dots i { animation: none; } }
+  </style>
 </head>
 <body>
+  <div id="splash" role="status" aria-live="polite">
+    <img src="icons/Icon-192.png" alt="">
+    <span>Cargando Woowfy…</span>
+    <div class="dots" aria-hidden="true"><i></i><i></i><i></i></div>
+  </div>
+  <script>
+    addEventListener('flutter-first-frame', function () {
+      var s = document.getElementById('splash');
+      if (!s) return;
+      s.style.opacity = '0';
+      setTimeout(function () { s.remove(); }, 300);
+    });
+  </script>
   <script>
     // Instalación como app (PWA): guardamos el evento del navegador para ofrecerlo desde la pantalla Cuenta.
     (function () {

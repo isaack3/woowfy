@@ -89,11 +89,12 @@ class _PendingByStore extends StatelessWidget {
 class _History extends StatelessWidget {
   const _History();
 
-  /// Planilla de una liquidación ya registrada, con los datos bancarios actuales del local.
+  /// Planilla de una liquidación ya registrada, con la cuenta a la que se pagó (guardada al liquidar). Las
+  /// liquidaciones antiguas no la guardaron: se usa la cuenta actual del local y se avisa.
   Future<void> _copy(BuildContext context, Payout p) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final bank = await Repository.instance.getBankAccount(p.storeId);
+      final bank = p.destination ?? await Repository.instance.getBankAccount(p.storeId);
       String cell(Object? v) => '"${(v ?? '').toString().replaceAll('"', '""')}"';
       final csv = [
         'local,titular,rut,banco,tipo_cuenta,numero_cuenta,correo,monto,ventas,liquidacion',
@@ -103,7 +104,11 @@ class _History extends StatelessWidget {
             .join(','),
       ].join('\n');
       await Clipboard.setData(ClipboardData(text: csv));
-      messenger.showSnackBar(const SnackBar(content: Text('Planilla copiada (CSV).')));
+      messenger.showSnackBar(SnackBar(
+        content: Text(p.destination != null
+            ? 'Planilla copiada (CSV).'
+            : 'Planilla copiada con la cuenta actual del local: esta liquidación es anterior y no guardó la cuenta de destino.'),
+      ));
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(friendlyError(e, fallback: 'No se pudo copiar la planilla.'))));
     }
