@@ -6,7 +6,115 @@ Chile primero, luego Latam.
 
 - **Landing:** https://woowfy.com (modo "en construcción" con lista de espera)
 - **App:** https://app.woowfy.com
-- **Hoja de ruta y estado:** [ROADMAP.md](ROADMAP.md)
+- **Hoja de ruta y estado:** [ROADMAP.md](ROADMAP.md) · **Producto y principios de diseño:** [PRODUCT.md](PRODUCT.md)
+- Un producto de **Passva SpA** (contacto: hola@passva.com)
+
+## Cómo funciona
+
+### Piezas del sistema
+
+Dos sitios en Firebase Hosting (la landing y la app) sobre un solo proyecto de Firebase. Todo lo que mueve
+dinero o códigos de retiro pasa por Cloud Functions: la app nunca escribe pedidos ni liquidaciones.
+
+```mermaid
+flowchart LR
+  subgraph personas["Personas"]
+    C["Cliente"]
+    M["Comercio"]
+    A["Admin"]
+  end
+  subgraph hosting["Firebase Hosting"]
+    L["woowfy.com<br/>landing HTML"]
+    W["app.woowfy.com<br/>Flutter web"]
+  end
+  subgraph firebase["Firebase · Santiago"]
+    AU["Auth<br/>correo y Google"]
+    FS[("Firestore")]
+    ST[("Storage<br/>fotos")]
+    CF["Cloud Functions"]
+    FCM["Cloud Messaging<br/>push"]
+  end
+  MP["Mercado Pago"]
+  RS["Resend<br/>correos"]
+  OSM["OpenStreetMap<br/>mapa y coordenadas"]
+
+  C --> L
+  C --> W
+  M --> W
+  A --> W
+  L -- "lista de espera y visitas" --> CF
+  W --> AU
+  W -- "lee y escribe según firestore.rules" --> FS
+  W --> ST
+  W -- "reservar, validar, liquidar" --> CF
+  CF --> FS
+  CF <-- "pago, webhook y reembolso" --> MP
+  CF --> RS
+  CF --> FCM
+  CF --> OSM
+  W --> OSM
+```
+
+### Una compra, de punta a punta
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor C as Cliente
+  participant App as App (Flutter web)
+  participant F as Cloud Functions
+  participant MP as Mercado Pago
+  actor M as Comercio
+  actor A as Admin
+
+  M->>App: Publica la bolsa del día (o se publica sola si es recurrente)
+  C->>App: "Reservar y pagar"
+  App->>F: createOrder
+  F-->>App: Bolsa apartada 15 min (pending_payment) y link de pago
+  C->>MP: Paga
+  MP-->>F: Webhook firmado (o syncOrderPayment al volver a la app)
+  F-->>App: Pedido pagado (paid): QR y código de retiro
+  F-->>C: Correo de compra (Resend) y recordatorio push
+  C->>M: En el local, dentro del horario, muestra el QR
+  M->>F: redeemOrder (modo mostrador)
+  alt Llegó antes del horario
+    F-->>M: "Aún no es hora": el comercio decide "Entregar igual"
+  end
+  F-->>M: "Entrega: 1 × bolsa" (picked_up)
+  Note over F: Si nadie retira, markNoShows lo marca no_show 1 h después: sin reembolso y se le paga igual al local
+  A->>F: createPayout o createAllPayouts (planilla CSV para el banco)
+  A->>M: Transferencia del 75% de las ventas
+  opt La transferencia falló
+    A->>F: voidPayout: las ventas vuelven a "por pagar"
+  end
+```
+
+### Estados de un pedido
+
+```mermaid
+stateDiagram-v2
+  [*] --> pending_payment: Reservar
+  pending_payment --> paid: Pago aprobado
+  pending_payment --> cancelled: Vence a los 15 min, pago rechazado o el cliente cancela
+  paid --> picked_up: El comercio valida el código
+  paid --> no_show: 1 h después del horario sin retirar
+  paid --> cancelled: El cliente cancela a tiempo o el comercio cancela la bolsa (con reembolso)
+  picked_up --> [*]
+  no_show --> [*]
+  cancelled --> [*]
+```
+
+### Estados de un local
+
+```mermaid
+stateDiagram-v2
+  [*] --> pending: Pide sumar su local
+  pending --> approved: El admin aprueba
+  pending --> rejected: El admin rechaza (con motivo)
+  rejected --> pending: Corrige sus datos y reenvía
+  approved --> suspended: El admin suspende
+  suspended --> approved: El admin reactiva
+```
 
 ## Stack
 
@@ -26,29 +134,34 @@ Proyecto Firebase: **`woowfy-app`** (plan Blaze). Paquete Android / Bundle iOS: 
 ```
 lib/
   main.dart, app.dart
-  core/          tema y logo, router, formato CLP, backend (emuladores/región), checkout,
-                 ubicación, push (FCM), instalación PWA, enlaces legales, analítica anónima,
-                 puente al escáner QR web (web_qr)
+  core/          tema y logo, router, formato CLP y fechas, errores en español (con "Reintentar"),
+                 RUT, backend (emuladores/región), checkout, ubicación, push (FCM), instalación PWA,
+                 enlaces legales, analítica anónima, puente al escáner QR web (web_qr)
   data/          modelos, repositorio Firestore/Functions/Storage, regiones de Chile
   features/
     shell/       navegación principal (Bolsas / Mis pedidos / Cuenta) y encabezado verde
-    home/        bolsas del día: filtros, orden, mapa y distancia
+    home/        bolsas del día: región, filtros, orden, mapa y distancia; sin bolsas, "cómo funciona" y
+                 lista de espera dentro de la app
     bags/        tarjeta, detalle (favorito, compartir) y "Reservar y pagar"
     auth/        ingreso / registro (correo y Google), recuperar contraseña
-    orders/      checkout simulado, comprobante con QR, "Mis pedidos"
+    orders/      checkout simulado, comprobante con QR (guardado para usar sin señal), confirmación
+                 automática del pago, "Mis pedidos"
     account/     cuenta: nombre, tu impacto, notificaciones, instalar app, legales
-    merchant/    panel del comercio: perfil, bolsas (y recurrentes), cancelar bolsa, validar retiro con QR,
-                 ventas y pagos, cuenta bancaria, enlace a la guía para comercios
-    admin/       solicitudes, comercios (liquidar / liquidar todos), ventas, analítica, interesados (y modo
-                 lanzamiento de la landing), usuarios, correo (plantillas y pruebas)
+    merchant/    panel del comercio: solicitud (y corrección si se rechaza), perfil, bolsas (y recurrentes),
+                 stock, cancelar bolsa, modo mostrador (validar retiros con QR), ventas y pagos, cuenta
+                 bancaria, enlace a la guía para comercios
+    admin/       solicitudes, comercios, pagos (liquidar, liquidar todos, anular, historial), ventas,
+                 analítica, interesados, usuarios, correo; aviso para lanzar la landing arriba de todo
 assets/brand/    isotipo usado en la app
 functions/src/
-  orders.ts          createOrder, confirmMockPayment, redeemOrder, expirePendingOrders, markNoShows,
+  orders.ts          createOrder, confirmMockPayment, redeemOrder (avisa si llega antes del horario),
+                     expirePendingOrders, markNoShows,
                      cancelOrder (cliente), cancelBag (comercio), mercadoPagoWebhook, syncOrderPayment
   payments.ts        PaymentProvider: mock | mercadopago (Checkout Pro, reembolsos, firma del webhook)
   reviews.ts         rateOrder: calificación de pedidos retirados y nota del local
-  payouts.ts         createPayout / createAllPayouts: liquidación de ventas a un local o a todos (admin)
-  waitlist.ts        joinWaitlist (formulario "Avísame" de la landing)
+  payouts.ts         createPayout / createAllPayouts: liquidación de ventas a un local o a todos (admin);
+                     voidPayout: anula una liquidación y sus ventas vuelven a "por pagar"
+  waitlist.ts        joinWaitlist (formulario "Avísame" de la landing y de la app sin bolsas)
   email.ts           correos vía Resend: onWaitlistCreated (bienvenida), onOrderUpdated (compra y reembolso),
                      previewEmail y sendTestEmail (vista previa y prueba desde el admin)
   analytics.ts       trackEvent: contadores anónimos de visitas por día (/api/track)
@@ -75,8 +188,8 @@ firestore.rules, firestore.indexes.json, storage.rules, storage-cors.json
 | Perfil | Cómo se obtiene | Qué hace |
 |---|---|---|
 | Cliente | Registrándose | Ve bolsas (lista o mapa), sigue locales, reserva y paga, retira con QR |
-| Comercio | Un usuario pide sumar su local y un admin lo aprueba | Perfil del local, publica bolsas (o recurrentes), valida retiros, ve ventas y registra su cuenta bancaria |
-| Admin | `role: admin` en `users/{uid}` | Aprueba comercios, liquida ventas, ve ventas, analítica e inscritos, lanza la landing, gestiona usuarios y correo |
+| Comercio | Un usuario pide sumar su local y un admin lo aprueba (si lo rechaza, corrige y reenvía) | Perfil del local, publica bolsas (o recurrentes), valida retiros, ve ventas y registra su cuenta bancaria |
+| Admin | `role: admin` en `users/{uid}` | Aprueba comercios, liquida (y anula) pagos, ve ventas, analítica e inscritos, lanza la landing, gestiona usuarios y correo |
 
 El primer admin se asignó a mano; los siguientes se dan desde **Admin → Usuarios**.
 
@@ -87,7 +200,7 @@ El primer admin se asignó a mano; los siguientes se dan desde **Admin → Usuar
 | `users/{uid}` | email, nombre, `role` (`customer` \| `admin`), `fcmTokens` (push) | el usuario (sin cambiar su rol); admin |
 | `users/{uid}/favorites/{storeId}` | locales que sigue el usuario | el propio usuario |
 | `stores/{id}` | local: categoría, logo, descripción, horario, dirección, `lat/lng`; `status`: `pending` → `approved` / `rejected` / `suspended` | el dueño crea y edita su perfil; admin cambia el estado |
-| `bags/{id}` | bolsa del día: precio, stock, horario, foto, categoría, logo y coordenadas del local | comercio aprobado (o la función de recurrentes); admin puede pausar |
+| `bags/{id}` | bolsa del día: precio (mínimo $500), stock (`quantityAvailable`) y cantidad publicada (`quantity`), horario, foto, categoría, logo y coordenadas del local | comercio aprobado (o la función de recurrentes); admin puede pausar |
 | `bagTemplates/{id}` | bolsa recurrente: días de la semana, horario `HH:mm`, precio, cantidad | comercio aprobado |
 | `orders/{id}` | compra: estado, monto, precio original, comisión, código de retiro, cancelación y reembolso, calificación, liquidación | **solo Cloud Functions** |
 | `orders/{id}/private/pickup` | código de retiro del pedido | **solo Cloud Functions**; lo lee solo el cliente |
@@ -96,8 +209,8 @@ El primer admin se asignó a mano; los siguientes se dan desde **Admin → Usuar
 | `config/site` | modo de la landing (`launched`): en construcción o lanzada | lectura pública; lo cambia el admin |
 | `pickupCodes/{storeId}_{código}` | índice de códigos vigentes para validar retiros | **solo Cloud Functions**; sin acceso desde la app |
 | `reviews/{orderId}` | calificación (1–5) y comentario de un pedido retirado | **solo la función** `rateOrder`; lectura pública |
-| `payouts/{id}` | pago de Woowfy a un comercio: pedidos, ventas, comisión, monto y nota | **solo la función** `createPayout`; lo ve el admin y el comercio |
-| `waitlist/{hash}` | inscritos de la landing: nombre, correo, tipo, región, comuna, estado del correo | **solo funciones**; lee el admin |
+| `payouts/{id}` | pago de Woowfy a un comercio: pedidos, ventas, comisión, monto, nota, cuenta de destino (`destination`) y anulación (`voidedAt`, `voidReason`) | **solo funciones** (`createPayout`, `createAllPayouts`, `voidPayout`); lo ve el admin y el comercio (sin las anuladas) |
+| `waitlist/{hash}` | inscritos de la landing y de la app: nombre, correo, tipo, región, comuna, origen, estado del correo | **solo funciones**; lee (y borra) el admin |
 | `config/email` | interruptor general, correos de pedidos (`orderEmails`) y remitente | solo admin (Admin → Correo) |
 
 Estados de un pedido: `pending_payment` (bolsa reservada 15 min) → `paid` (muestra QR) →
@@ -121,7 +234,7 @@ Las rutas van en inglés; los textos de la interfaz, en español de Chile.
 | `/mock-checkout/:id` | Pago simulado |
 | `/merchant` | Panel del comercio |
 | `/merchant/sales` | Ventas y pagos del comercio |
-| `/admin` | Panel admin |
+| `/admin?tab=…` | Panel admin; cada pestaña tiene su URL (`solicitudes`, `comercios`, `pagos`, `ventas`, `analitica`, `interesados`, `usuarios`, `correo`) |
 
 Landing: `/`, `/merchants` (guía para comercios), `/terms`, `/privacy`, `/api/waitlist` (rewrite hacia
 `joinWaitlist`) y `/api/track` (analítica, también en la app).
@@ -214,8 +327,9 @@ Google Auth Platform → Información de la marca.
 
 ## Funcionalidades clave
 
-- **Lista de espera (landing):** el formulario "Avísame cuando lancen" envía a `/api/waitlist`, sin cargar
-  Firebase en la página. Los inscritos se ven en **Admin → Interesados** (copiar correos o CSV).
+- **Lista de espera:** el formulario "Avísame cuando lancen" de la landing envía a `/api/waitlist`, sin cargar
+  Firebase en la página. La app usa la misma función cuando una región no tiene bolsas (con sesión, nombre y
+  correo vienen escritos). Los inscritos se ven en **Admin → Interesados** (copiar correos o CSV).
 - **Bolsas recurrentes:** el comercio activa "Repetir" y elige días; se publican solas a las 5:00 (hora de
   Chile, con horario de verano) o apenas se crean si aún es hora. El id diario evita duplicados.
 - **Mapa y cercanía:** OpenStreetMap vía `flutter_map` (sin clave). Las coordenadas del local se calculan al
@@ -227,17 +341,27 @@ Google Auth Platform → Información de la marca.
 - **Escáner QR (web):** `web/qr_scanner.js` abre una capa HTML propia sobre la app (cámara con `playsinline`,
   BarcodeDetector o jsQR). Funciona en Safari de iPhone, Chrome y computadores; si no hay cámara o permiso,
   explica cómo activarlo y ofrece escribir el código. `mobile_scanner` queda para la futura app nativa.
+- **Modo mostrador:** "Validar retiro" deja la cámara abierta y valida un cliente tras otro (verde: entrega;
+  rojo: no entregues; ámbar: "Aún no es hora", con "Entregar igual"). En hora de retiro (desde 30 min antes) es
+  el botón flotante del panel. Al cliente se le pide llegar dentro del horario antes de pagar, en el comprobante
+  y en el correo.
+- **Publicar bolsas:** precio mínimo $500 (formulario y reglas). Al editar, "Quedan hoy" sube o baja el stock en una
+  transacción (nunca bajo 0); "publicar igual que ayer" repite la cantidad de la última vez.
 - **Código de retiro privado:** vive en `orders/{id}/private/pickup` (solo el cliente) y en
   `pickupCodes/{local}_{código}` (solo el servidor). El comercio lo valida cuando el cliente se lo muestra.
 - **Pagos al local:** "Por recibir" suma pedidos retirados y no retirados (`no_show`, los marca `markNoShows`
   1 h después del retiro). El local registra su cuenta bancaria en *Ventas y pagos* con un flujo visual de 3 pasos
-  (Agrega tu cuenta → Vende y entrega → Te transferimos), igual que en la guía. El admin liquida por local o con
-  **Liquidar todos**, que entrega una planilla CSV con titular, RUT, banco, cuenta y monto de cada local.
-- **Red de seguridad de pagos:** si el aviso de Mercado Pago no llega, `syncOrderPayment` (al volver del pago o
-  con "Ya pagué, verificar") y `expirePendingOrders` consultan el pago a Mercado Pago antes de vencer la reserva.
+  (Agrega tu cuenta → Vende y entrega → Te transferimos), igual que en la guía. En **Admin → Pagos** se liquida
+  por local o con **Liquidar todos**, que entrega una planilla CSV con titular, RUT, banco, cuenta y monto de cada
+  local. Primero se transfiere y después se registra; cada liquidación guarda la cuenta de destino, y si la
+  transferencia falló se **anula** (sus ventas vuelven a "por pagar").
+- **Red de seguridad de pagos:** si el aviso de Mercado Pago no llega, `syncOrderPayment` (al volver del pago la
+  app lo revisa sola cada 15 s durante 1 minuto, y luego con "Revisar de nuevo") y `expirePendingOrders` consultan
+  el pago a Mercado Pago antes de vencer la reserva.
 - **Analítica anónima:** `/api/track` suma contadores por día en `stats/` (sin cookies ni datos personales).
   Admin → Analítica muestra visitas, inscritos, cuentas nuevas y el embudo hasta el retiro.
-- **Modo lanzamiento de la landing:** interruptor en Admin → Interesados (`config/site`). `landing/site.js`
+- **Modo lanzamiento de la landing:** botón "Lanzar" arriba de todo el admin mientras siga "en construcción", e
+  interruptor en Admin → Interesados (`config/site`). `landing/site.js`
   muestra los elementos `data-prelaunch` o `data-launch` según ese valor, sin redesplegar.
 - **Fotos (Storage):** se suben a `uploads/{uid}/...` (cada usuario solo escribe en su carpeta, imágenes de
   hasta 5 MB). Así las reglas no dependen de Firestore. Para que la app web pueda mostrarlas, el bucket
@@ -267,7 +391,8 @@ Plantillas en `functions/src/email.ts` (HTML con la paleta de la marca):
 ## Páginas legales
 
 `landing/terms.html` (`/terms`) y `landing/privacy.html` (`/privacy`): **borradores** pendientes de revisión
-legal y de completar los datos de la SpA (marcados en amarillo). Actualizados el 29-09-2026 con: código de retiro
+legal. Ya tienen los datos de **Passva SpA** (RUT 78.487.341-2, Santiago); quedan valores por confirmar marcados en
+amarillo (comisión, plazos, pago semanal). Actualizados el 29-09-2026 con: código de retiro
 personal, pedidos no retirados, arrepentimiento de 15 min, reembolso de pagos tardíos, comisión y liquidaciones,
 calificaciones públicas con nombre de pila, notificaciones, datos bancarios de comercios, analítica anónima y
 servicios técnicos de terceros (OpenStreetMap, Google Fonts, jsDelivr). Enlazados desde la landing, el formulario

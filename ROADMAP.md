@@ -5,7 +5,7 @@ Marca las casillas a medida que avancemos. Última actualización: 10-10-2026 (r
 
 **En línea:** [woowfy.com](https://woowfy.com) (landing) · [app.woowfy.com](https://app.woowfy.com) (app)
 
-## 📍 Dónde quedamos (29-09-2026)
+## 📍 Dónde quedamos (10-10-2026)
 
 **Lo técnico del piloto está completo.** Mercado Pago funciona de punta a punta con una cuenta de prueba (webhook
 firmado + red de seguridad). Clientes: lista, mapa, favoritos, reserva, QR, cancelar (2 h antes o 15 min después
@@ -15,9 +15,14 @@ liquidar / liquidar todos (planilla CSV), ventas, analítica anónima, interesad
 usuarios y correo (plantillas de bienvenida, compra y reembolso). Auditoría del 28-09 corregida. Inicio de sesión con Google desde
 `app.woowfy.com` ("Ir a woowfy.com"). Sprints 1–4 desplegados; la landing sigue "en construcción".
 
+**Del 09 al 10-10:** tres críticas de diseño (Impeccable) y 8 rondas de arreglos: errores en español con
+"Reintentar", modo mostrador, reglas de dinero antes de pagar, comprobante sin señal, Home con región y lista de
+espera, landing honesta, admin con pestaña Pagos, liquidaciones que se pueden anular, retiro temprano con aviso.
+Woowfy es un producto de **Passva SpA** (RUT 78.487.341-2), contacto `hola@passva.com`.
+
 **Para retomar, primero lo que depende de ti** (sección "Pendiente" más abajo): probar el escáner en iPhone,
-activar Resend (los correos ya están listos), constituir la SpA y pasar Mercado Pago a producción. Con eso se
-puede lanzar (interruptor en Admin → Interesados).
+activar Resend (los correos ya están listos), revisión legal y pasar Mercado Pago a producción con la cuenta de
+Passva SpA. Con eso se puede lanzar (botón "Lanzar" arriba del admin).
 
 ---
 
@@ -265,7 +270,7 @@ Puntajes (heurísticas de Nielsen): Home 22/40 · flujo cliente 22/40 · comerci
 ### Pendiente (depende de ti)
 - [ ] 🔐 Verificación de marca en Google Auth Platform (opcional ahora: el inicio de sesión ya dice "Ir a woowfy.com")
 - [ ] 📷 Probar el escáner QR nuevo en iPhone (Safari) con una compra de prueba
-- [ ] 💸 Probar la liquidación: cuenta bancaria en *Ventas y pagos* y Admin → Comercios → "Liquidar todos"
+- [ ] 💸 Probar la liquidación: cuenta bancaria en *Ventas y pagos* y Admin → Pagos → "Liquidar todos" (si fue de prueba, "Anular")
 - [ ] ✏️ Confirmar en la guía para comercios "pago semanal" y "aprobación en 1 día hábil" (y en los términos)
 - [ ] Confirmar en tu navegador que al recargar `app.woowfy.com/merchant` sigues con sesión
 - [ ] 🔔 **Clave VAPID** para notificaciones push: consola Firebase → Configuración del proyecto → Cloud Messaging
@@ -275,8 +280,8 @@ Puntajes (heurísticas de Nielsen): Home 22/40 · flujo cliente 22/40 · comerci
       Admin → Correo (hoy el secreto tiene un valor provisional)
 - [x] ~~Reenvío `hola@woowfy.com` con ImprovMX~~: ya no hace falta, el contacto es `hola@passva.com` (10-10). Queda opcional el TXT `_dmarc`
 - [ ] 🗺️ Revisar el mapa en la app y poner la dirección real de tu local (hoy ubicado en el centro de El Monte)
-- [ ] ⚖️ Revisión legal de `/terms` y `/privacy` (actualizados el 29-09 con todo lo nuevo) y completar datos de la
-      SpA y los valores en amarillo (2 reservas, 25%, pago semanal)
+- [ ] ⚖️ Revisión legal de `/terms` y `/privacy` (ya con los datos de Passva SpA) y confirmar los valores en
+      amarillo (2 reservas, 25%, pago semanal)
 - [ ] 💰 **Alerta de presupuesto** en Google Cloud Billing (ej. USD 10)
 - [ ] ↪️ Redirección 301 `www.woowfy.com` → `woowfy.com` (consola → Hosting → sitio woowfy-app → editar dominio)
 - [x] `firebase functions:secrets:prune` (hecho el 10-10)
@@ -299,8 +304,8 @@ Puntajes (heurísticas de Nielsen): Home 22/40 · flujo cliente 22/40 · comerci
 
 ## Fase 2 — Pagos reales y operación
 
-- [ ] **Constituir la SpA** (ver sección "Empresa" abajo) ← bloquea el cobro real
-- [ ] Cuenta Mercado Pago **a nombre de la SpA**
+- [x] **SpA:** Woowfy es de **Passva SpA** (RUT 78.487.341-2), ver sección "Empresa" abajo
+- [ ] Cuenta Mercado Pago **a nombre de Passva SpA** ← bloquea el cobro real
 - [x] Implementar `MercadoPagoProvider` (Checkout Pro) + webhook `mercadoPagoWebhook` firmado + reembolsos (Sprint 3)
 - [x] Probar con **credenciales de prueba** de Mercado Pago: compra de punta a punta OK (28-09)
 - [ ] Definir cómo se paga a los comercios:
@@ -358,13 +363,13 @@ divide sola: Mercado Pago deposita el 75% en la cuenta del local y cobra el 25% 
 
 ## Pagos: ¿mock, MP personal o SpA?
 
-**Recomendación: seguir con el mock ahora** (ya implementado) y no usar tu Mercado Pago personal
-para cobros reales.
+**Hoy:** Mercado Pago con credenciales de prueba (no se cobra dinero real). El siguiente paso es la cuenta de
+Mercado Pago de Passva SpA; no usar un Mercado Pago personal para cobros reales.
 
 | Opción | ¿Sirve para? | Comentario |
 |---|---|---|
-| **Mock (actual)** | Desarrollo y demos | Sin cuenta ni tokens. Se cambia a MP con `PAYMENTS_PROVIDER=mercadopago` |
-| **Credenciales de prueba de MP** (cuenta personal) | Probar la integración real | En Mercado Pago Developers → *Tus integraciones* → crear aplicación → *Credenciales de prueba*. **No mueve dinero real.** Está bien usar tu cuenta personal solo para esto |
+| **Mock** (emuladores) | Desarrollo y demos | Sin cuenta ni tokens. Se cambia a MP con `PAYMENTS_PROVIDER=mercadopago` |
+| **Credenciales de prueba de MP** (actual) | Probar la integración real | En Mercado Pago Developers → *Tus integraciones* → crear aplicación → *Credenciales de prueba*. **No mueve dinero real.** Está bien usar tu cuenta personal solo para esto |
 | MP personal en producción | ❌ No recomendado | Mezcla ingresos personales con los del negocio (problemas con el SII), no emite facturas a nombre de Woowfy, y el modelo marketplace requiere cuenta de empresa |
 | **MP de la SpA** en producción | Cobros reales | El camino correcto cuando haya comercios reales |
 
@@ -378,10 +383,13 @@ pero la SpA separa tu patrimonio personal de los riesgos del negocio y es lo est
 
 Pasos (con Clave Única):
 
-- [ ] **1. Constituir la SpA** en [Registro de Empresas y Sociedades](https://www.registrodeempresasysociedades.cl)
+**Estado (10-10):** la SpA ya existe: **Passva SpA**, RUT 78.487.341-2, Santiago (también dueña de passva.com).
+Los pasos siguientes quedan por confirmar.
+
+- [x] **1. Constituir la SpA** en [Registro de Empresas y Sociedades](https://www.registrodeempresasysociedades.cl)
       ("Tu Empresa en un Día"). Gratis, 100% online, puede tener un único socio.
       Define: razón social (ej. "Woowfy SpA"), giro, capital inicial, administración.
-- [ ] **2. RUT e inicio de actividades** en el [SII](https://www.sii.cl) — se puede hacer desde el mismo
+- [ ] **2. RUT (✅ 78.487.341-2) e inicio de actividades** (confirmar el giro de intermediación digital) en el [SII](https://www.sii.cl) — se puede hacer desde el mismo
       registro. Giro sugerido: servicios de intermediación a través de plataformas digitales
       (confirmar el código de actividad con tu contador).
 - [ ] **3. Elegir régimen tributario** — normalmente **Pro Pyme** (general o transparente). Decidir con contador.
@@ -390,7 +398,7 @@ Pasos (con Clave Única):
 - [ ] **5. Cuenta bancaria** a nombre de la SpA (banco o banco digital para pymes).
 - [ ] **6. Patente municipal** en la comuna del domicilio de la empresa (aunque sea tu casa u oficina virtual).
 - [ ] **7. Contador** (aprox. CLP 30–80 mil/mes para una SpA pequeña): declaraciones mensuales (F29) y anual.
-- [ ] **8. Cuenta Mercado Pago de empresa** con el RUT de la SpA → credenciales de producción.
+- [ ] **8. Cuenta Mercado Pago de empresa** con el RUT de Passva SpA → credenciales de producción.
 - [ ] **9. Marca "Woowfy" en [INAPI](https://www.inapi.cl)** (clases 35, 39/43 y 42) y dominio `woowfy.cl` en NIC Chile.
 - [ ] **10. Contratos**: acuerdo con comercios (comisión, responsabilidad sanitaria del local, reembolsos)
       y T&C para clientes. Idealmente revisados por un abogado.

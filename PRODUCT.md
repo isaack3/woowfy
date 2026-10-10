@@ -37,7 +37,7 @@ Decisión abierta: el usuario aún no define si estos tres puntos son el posicio
 - El comercio puede cancelar la bolsa del día (reembolso y aviso push a compradores).
 - Calificación 1–5 tras retirar; nota del local visible en tarjetas y detalle.
 - Correos transaccionales (bienvenida, compra, reembolso) vía Resend; push vía FCM (pendiente clave VAPID).
-- Landing `woowfy.com` en modo "en construcción" con lista de espera; se lanza con un interruptor en Admin → Interesados.
+- Landing `woowfy.com` en modo "en construcción" con lista de espera; se lanza con el botón "Lanzar" arriba del admin (o el interruptor en Admin → Interesados).
 
 ## Capabilities and Constraints
 
