@@ -1,10 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/errors.dart';
 import '../../core/location.dart';
 import '../../core/theme.dart';
+import '../../data/chile.dart';
 import '../../data/models.dart';
 import '../../data/repository.dart';
 import '../bags/bag_card.dart';
@@ -20,13 +23,18 @@ enum _Sort {
   const _Sort(this.label);
   final String label;
 }
-
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
+
+/// Clave donde se recuerda la región elegida (en el navegador o el teléfono).
+const _regionKey = 'home.region';
+
+const _waitlistUrl = 'https://woowfy.com/#waitlist';
+const _merchantsGuideUrl = 'https://woowfy.com/merchants';
 
 class _HomePageState extends State<HomePage> {
   Stream<List<Bag>> _bags = Repository.instance.watchAvailableBags();
@@ -35,6 +43,8 @@ class _HomePageState extends State<HomePage> {
       ? Stream.value(<String>{})
       : Repository.instance.watchFavoriteStoreIds(_uid);
   String? _category;
+  /// Región elegida; null = todo Chile.
+  String? _region;
   bool _pickupNow = false;
   bool _favoritesOnly = false;
   bool _map = false;
@@ -42,9 +52,51 @@ class _HomePageState extends State<HomePage> {
   LatLng? _me;
   bool _locating = false;
 
-  /// Pide la ubicación (una vez). Devuelve false si el usuario no la entrega.
+  @override
+  void initState() {
+    super.initState();
+    _loadRegion();
+  }
+
+  Future<void> _loadRegion() async {
+    try {
+      final saved = (await SharedPreferences.getInstance()).getString(_regionKey);
+      if (saved != null && chileRegions.contains(saved) && mounted) setState(() => _region = saved);
+    } catch (_) {
+      // Sin almacenamiento (p. ej. navegación privada): se parte en todo Chile.
+    }
+  }
+
+  Future<void> _setRegion(String? region) async {
+    setState(() => _region = region);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      region == null ? await prefs.remove(_regionKey) : await prefs.setString(_regionKey, region);
+    } catch (e) {
+      debugPrint('No se pudo guardar la región: $e');
+    }
+  }
+
+  /// Pide la ubicación (una vez), explicando antes para qué. Devuelve false si el usuario no la entrega.
   Future<bool> _locate() async {
     if (_me != null) return true;
+    if (!await locationGranted()) {
+      if (!mounted) return false;
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Usar tu ubicación'),
+          content: const Text('La usamos solo en este momento para ordenar las bolsas por cercanía y mostrarte en el mapa. '
+              'No la guardamos.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Ahora no')),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Continuar')),
+          ],
+        ),
+      );
+      if (ok != true) return false;
+    }
+    if (!mounted) return false;
     setState(() => _locating = true);
     final me = await currentPosition();
     if (!mounted) return false;
@@ -56,7 +108,7 @@ class _HomePageState extends State<HomePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'No pudimos obtener tu ubicación. Revisa el permiso de ubicación del navegador.',
+            'No pudimos obtener tu ubicación. Revisa el permiso de ubicación del navegador, o elige tu región.',
           ),
         ),
       );
@@ -69,9 +121,30 @@ class _HomePageState extends State<HomePage> {
     setState(() => _sort = sort);
   }
 
-  Future<void> _toggleMap() async {
-    setState(() => _map = !_map);
-    if (_map) await _locate();
+  Future<void> _setMap(bool map) async {
+    setState(() => _map = map);
+    // En el mapa la ubicación es un extra: solo se usa si ya hay permiso (no se pide de nuevo).
+    if (map && _me == null && await locationGranted()) await _locate();
+  }
+
+  Future<void> _pickRegion(List<Bag> all) async {
+    final counts = <String, int>{};
+    for (final b in all.where((b) => !b.soldOut)) {
+      counts[b.region] = (counts[b.region] ?? 0) + 1;
+    }
+    final picked = await showModalBottomSheet<_RegionChoice>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => _RegionSheet(selected: _region, counts: counts, total: all.where((b) => !b.soldOut).length),
+    );
+    if (picked == null) return;
+    if (picked.nearMe) {
+      await _setRegion(null);
+      await _setSort(_Sort.nearest);
+    } else {
+      await _setRegion(picked.region);
+    }
   }
 
   Map<String, double> _distances(List<Bag> bags) => {
@@ -86,6 +159,7 @@ class _HomePageState extends State<HomePage> {
     Map<String, double> distances,
   ) {
     final list = all.where((b) {
+      if (_region != null && b.region != _region) return false;
       if (_favoritesOnly && !favorites.contains(b.storeId)) return false;
       if (_category != null && b.category != _category) return false;
       if (_pickupNow && !b.pickupNow) return false;
@@ -125,14 +199,19 @@ class _HomePageState extends State<HomePage> {
                 ? const <String, double>{}
                 : _distances(all);
             final bags = all == null ? null : _apply(all, favorites, distances);
+            final inRegion = all?.where((b) => _region == null || b.region == _region).toList();
             final filtered = _category != null || _pickupNow || _favoritesOnly;
-            final subtitle = all == null
-                ? 'Todo Chile'
-                : '${all.length} ${all.length == 1 ? 'bolsa disponible' : 'bolsas disponibles'} · todo Chile';
-            // Solo se ofrecen las categorías que tienen bolsas hoy (más la elegida, para poder quitarla).
+            final place = _region ?? 'todo Chile';
+            final available = inRegion?.where((b) => !b.soldOut).length;
+            final subtitle = available == null
+                ? (_region ?? 'Todo Chile')
+                : available == 0
+                    ? 'Pronto en tu zona · $place'
+                    : '$available ${available == 1 ? 'bolsa disponible' : 'bolsas disponibles'} · $place';
+            // Solo se ofrecen las categorías que tienen bolsas hoy en la zona (más la elegida, para poder quitarla).
             final categories =
                 {
-                  ...?all?.map((b) => b.category).whereType<String>(),
+                  ...?inRegion?.map((b) => b.category).whereType<String>(),
                   ?_category,
                 }.toList()..sort(
                   (a, b) => storeCategories
@@ -151,19 +230,22 @@ class _HomePageState extends State<HomePage> {
                 if (all != null && all.isNotEmpty)
                   SliverToBoxAdapter(
                     child: _Filters(
+                      region: _region,
                       categories: categories,
                       category: _category,
                       pickupNow: _pickupNow,
                       favoritesOnly: _favoritesOnly,
                       showFavorites: _uid != null,
+                      showCategories: inRegion!.isNotEmpty,
                       sort: _sort,
                       map: _map,
                       locating: _locating,
+                      onRegion: () => _pickRegion(all),
                       onCategory: (c) => setState(() => _category = c),
                       onPickupNow: (v) => setState(() => _pickupNow = v),
                       onFavorites: (v) => setState(() => _favoritesOnly = v),
                       onSort: _setSort,
-                      onToggleMap: _toggleMap,
+                      onMap: _setMap,
                     ),
                   ),
                 if (snap.hasError)
@@ -180,29 +262,35 @@ class _HomePageState extends State<HomePage> {
                     hasScrollBody: false,
                     child: Center(child: CircularProgressIndicator()),
                   )
+                else if (inRegion!.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _EmptyHome(
+                      region: _region,
+                      onAllChile: all!.isEmpty ? null : () => _setRegion(null),
+                    ),
+                  )
                 else if (bags.isEmpty)
                   SliverFillRemaining(
                     hasScrollBody: false,
-                    child: filtered
-                        ? _Message(
-                            icon: Icons.filter_alt_off_outlined,
-                            text: _favoritesOnly && favorites.isEmpty
-                                ? 'Aún no tienes locales favoritos. Toca el corazón en una bolsa para seguir al local.'
-                                : 'No hay bolsas con estos filtros.',
-                            action: TextButton(
+                    child: _Message(
+                      icon: Icons.filter_alt_off_outlined,
+                      text: _favoritesOnly && favorites.isEmpty
+                          ? 'Aún no tienes locales favoritos. En el detalle de una bolsa, toca el corazón para seguir al local.'
+                          : filtered
+                              ? 'No hay bolsas con estos filtros.'
+                              : 'No hay bolsas disponibles por ahora.',
+                      action: filtered
+                          ? TextButton(
                               onPressed: () => setState(() {
                                 _category = null;
                                 _pickupNow = false;
                                 _favoritesOnly = false;
                               }),
                               child: const Text('Quitar filtros'),
-                            ),
-                          )
-                        : const _Message(
-                            icon: Icons.eco_outlined,
-                            text:
-                                'Hoy no hay bolsas disponibles.\nLos locales publican durante el día: vuelve más tarde.',
-                          ),
+                            )
+                          : null,
+                    ),
                   )
                 else if (_map)
                   SliverFillRemaining(
@@ -251,36 +339,43 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
+/// Dos filas: arriba dónde, cómo se ordena y cómo se ve (lista o mapa); abajo los filtros.
 class _Filters extends StatelessWidget {
   const _Filters({
+    required this.region,
     required this.categories,
     required this.category,
     required this.pickupNow,
     required this.favoritesOnly,
     required this.showFavorites,
+    required this.showCategories,
     required this.sort,
     required this.map,
     required this.locating,
+    required this.onRegion,
     required this.onCategory,
     required this.onPickupNow,
     required this.onFavorites,
     required this.onSort,
-    required this.onToggleMap,
+    required this.onMap,
   });
 
+  final String? region;
   final List<String> categories;
   final String? category;
   final bool pickupNow;
   final bool favoritesOnly;
   final bool showFavorites;
+  final bool showCategories;
   final _Sort sort;
   final bool map;
   final bool locating;
+  final VoidCallback onRegion;
   final ValueChanged<String?> onCategory;
   final ValueChanged<bool> onPickupNow;
   final ValueChanged<bool> onFavorites;
   final ValueChanged<_Sort> onSort;
-  final VoidCallback onToggleMap;
+  final ValueChanged<bool> onMap;
 
   @override
   Widget build(BuildContext context) {
@@ -305,15 +400,79 @@ class _Filters extends StatelessWidget {
       ),
     );
 
+    // Botón tipo "pastilla" con valor visible y flecha (abre una lista).
+    Widget picker(IconData icon, String label, {bool active = false}) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: ShapeDecoration(
+            color: active ? WoowfyColors.lime : Colors.white,
+            shape: const StadiumBorder(side: BorderSide(color: WoowfyColors.line)),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(icon, size: 16, color: WoowfyColors.green),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(label,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: WoowfyColors.green, fontWeight: FontWeight.w700, fontSize: 13)),
+            ),
+            const Icon(Icons.arrow_drop_down, size: 18, color: WoowfyColors.green),
+          ]),
+        );
+
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1100),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 8, 4),
-          child: Row(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: SingleChildScrollView(
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Semantics(
+                    button: true,
+                    label: 'Zona: ${region ?? 'Todo Chile'}. Cambiar',
+                    excludeSemantics: true,
+                    child: InkWell(
+                      customBorder: const StadiumBorder(),
+                      onTap: onRegion,
+                      child: picker(Icons.place_outlined, region ?? 'Todo Chile', active: region != null),
+                    ),
+                  ),
+                  PopupMenuButton<_Sort>(
+                    tooltip: 'Ordenar',
+                    initialValue: sort,
+                    onSelected: onSort,
+                    itemBuilder: (_) => [
+                      for (final s in _Sort.values)
+                        PopupMenuItem(value: s, child: Text(s.label)),
+                    ],
+                    child: picker(Icons.sort, sort.label),
+                  ),
+                  if (locating)
+                    const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  SegmentedButton<bool>(
+                    showSelectedIcon: false,
+                    style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                    segments: const [
+                      ButtonSegment(value: false, label: Text('Lista'), icon: Icon(Icons.view_agenda_outlined, size: 16)),
+                      ButtonSegment(value: true, label: Text('Mapa'), icon: Icon(Icons.map_outlined, size: 16)),
+                    ],
+                    selected: {map},
+                    onSelectionChanged: (v) => onMap(v.first),
+                  ),
+                ],
+              ),
+              if (showCategories) ...[
+                const SizedBox(height: 10),
+                SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
@@ -328,8 +487,14 @@ class _Filters extends StatelessWidget {
                           'Favoritos',
                           favoritesOnly,
                           () => onFavorites(!favoritesOnly),
-                          icon: Icons.favorite_border,
+                          icon: favoritesOnly ? Icons.favorite : Icons.favorite_border,
                         ),
+                      Container(
+                        width: 1,
+                        height: 24,
+                        margin: const EdgeInsets.only(right: 8),
+                        color: WoowfyColors.line,
+                      ),
                       chip('Todas', category == null, () => onCategory(null)),
                       for (final c in categories)
                         chip(
@@ -340,32 +505,144 @@ class _Filters extends StatelessWidget {
                     ],
                   ),
                 ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RegionChoice {
+  const _RegionChoice({this.region, this.nearMe = false});
+
+  final String? region;
+  final bool nearMe;
+}
+
+/// Lista de "Todo Chile" + las 16 regiones con cuántas bolsas hay hoy, y la opción de usar la ubicación.
+class _RegionSheet extends StatelessWidget {
+  const _RegionSheet({required this.selected, required this.counts, required this.total});
+
+  final String? selected;
+  final Map<String, int> counts;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final muted = t.bodySmall?.copyWith(color: WoowfyColors.muted);
+    Widget option(String label, String? value, int count) => ListTile(
+          selected: selected == value,
+          selectedTileColor: WoowfyColors.limeSoft,
+          selectedColor: WoowfyColors.green,
+          leading: Icon(selected == value ? Icons.check : null, color: WoowfyColors.green),
+          title: Text(label),
+          trailing: Text(count == 1 ? '1 bolsa' : '$count bolsas', style: muted),
+          onTap: () => Navigator.pop(context, _RegionChoice(region: value)),
+        );
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .8),
+      child: ListView(
+        shrinkWrap: true,
+        padding: const EdgeInsets.only(bottom: 16),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text('¿Dónde quieres rescatar?', style: t.titleMedium),
+          ),
+          ListTile(
+            leading: const Icon(Icons.my_location, color: WoowfyColors.green),
+            title: const Text('Usar mi ubicación'),
+            subtitle: const Text('Todo Chile, ordenado por cercanía'),
+            onTap: () => Navigator.pop(context, const _RegionChoice(nearMe: true)),
+          ),
+          const Divider(),
+          option('Todo Chile', null, total),
+          for (final r in chileRegions) option(r, r, counts[r] ?? 0),
+        ],
+      ),
+    );
+  }
+}
+
+/// Sin bolsas (en todo Chile o en la región elegida): explica cómo funciona, deja avisarse e invita a los locales.
+class _EmptyHome extends StatelessWidget {
+  const _EmptyHome({required this.region, this.onAllChile});
+
+  final String? region;
+
+  /// Solo cuando hay bolsas en otras regiones.
+  final VoidCallback? onAllChile;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    Widget step(String n, String text) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(children: [
+            CircleAvatar(
+              radius: 13,
+              backgroundColor: WoowfyColors.limeSoft,
+              child: Text(n, style: const TextStyle(color: WoowfyColors.green, fontWeight: FontWeight.w900, fontSize: 13)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Text(text, style: t.bodyLarge)),
+          ]),
+        );
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                region == null ? 'Aún no hay bolsas publicadas' : 'Aún no hay bolsas en $region',
+                style: t.titleLarge,
               ),
-              if (locating)
-                const Padding(
-                  padding: EdgeInsets.all(12),
-                  child: SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+              const SizedBox(height: 4),
+              Text(
+                'Los locales publican durante el día lo que no vendieron. Así funciona:',
+                style: t.bodyMedium?.copyWith(color: WoowfyColors.muted),
+              ),
+              const SizedBox(height: 12),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Column(children: [
+                    step('1', 'Reservas una bolsa sorpresa a mitad de precio.'),
+                    step('2', 'Pagas en línea, sin instalar nada.'),
+                    step('3', 'La retiras en el local mostrando tu QR.'),
+                  ]),
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (onAllChile != null) ...[
+                FilledButton(onPressed: onAllChile, child: const Text('Ver bolsas de todo Chile')),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  onPressed: () => launchUrl(Uri.parse(_waitlistUrl)),
+                  child: const Text('Avísame cuando haya bolsas aquí'),
+                ),
+              ] else
+                FilledButton(
+                  onPressed: () => launchUrl(Uri.parse(_waitlistUrl)),
+                  child: const Text('Avísame cuando haya bolsas'),
+                ),
+              const SizedBox(height: 12),
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text('¿Tienes un local?', style: t.bodyMedium?.copyWith(color: WoowfyColors.muted)),
+                  TextButton(
+                    onPressed: () => launchUrl(Uri.parse(_merchantsGuideUrl)),
+                    child: const Text('Publica tus bolsas'),
                   ),
-                ),
-              IconButton(
-                tooltip: map ? 'Ver lista' : 'Ver mapa',
-                icon: Icon(
-                  map ? Icons.view_agenda_outlined : Icons.map_outlined,
-                  color: WoowfyColors.green,
-                ),
-                onPressed: onToggleMap,
-              ),
-              PopupMenuButton<_Sort>(
-                tooltip: 'Ordenar',
-                icon: const Icon(Icons.sort, color: WoowfyColors.green),
-                initialValue: sort,
-                onSelected: onSort,
-                itemBuilder: (_) => [
-                  for (final s in _Sort.values)
-                    PopupMenuItem(value: s, child: Text(s.label)),
                 ],
               ),
             ],

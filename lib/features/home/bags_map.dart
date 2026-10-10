@@ -20,9 +20,20 @@ class BagsMap extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final located = bags.where((b) => b.hasLocation).toList();
-    final center = me ?? (located.isNotEmpty ? LatLng(located.first.lat!, located.first.lng!) : santiago);
+    // Con ubicación, centrado en la persona; si no, encuadra las bolsas (sin suponer Santiago).
+    final points = [for (final b in located) LatLng(b.lat!, b.lng!)];
+    final fit = me == null && points.length > 1
+        ? CameraFit.coordinates(coordinates: points, padding: const EdgeInsets.all(48), maxZoom: 15)
+        : null;
+    final center = me ?? (points.isNotEmpty ? points.first : chileCenter);
     return FlutterMap(
-      options: MapOptions(initialCenter: center, initialZoom: me != null ? 13 : 11, minZoom: 4, maxZoom: 18),
+      options: MapOptions(
+        initialCenter: center,
+        initialZoom: me != null ? 13 : (points.isNotEmpty ? 13 : 4),
+        initialCameraFit: fit,
+        minZoom: 4,
+        maxZoom: 18,
+      ),
       children: [
         TileLayer(
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',

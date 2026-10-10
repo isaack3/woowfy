@@ -27,5 +27,15 @@ String formatDistance(double meters) {
   return km < 10 ? '${km.toStringAsFixed(1).replaceAll('.', ',')} km' : '${km.round()} km';
 }
 
-/// Centro de Santiago, para el mapa cuando no hay ubicación del usuario.
-const santiago = LatLng(-33.4378, -70.6505);
+/// Centro aproximado de Chile continental (para el mapa cuando no hay bolsas ni ubicación).
+const chileCenter = LatLng(-35.7, -71.5);
+
+/// true si ya hay permiso de ubicación (no lo pide). Sirve para explicar antes de pedirlo.
+Future<bool> locationGranted() async {
+  try {
+    final p = await Geolocator.checkPermission();
+    return p == LocationPermission.always || p == LocationPermission.whileInUse;
+  } catch (_) {
+    return false;
+  }
+}

@@ -1,7 +1,7 @@
 # Woowfy — Hoja de ruta
 
 Marketplace de bolsas sorpresa contra el desperdicio de comida. Chile primero, luego Latam.
-Marca las casillas a medida que avancemos. Última actualización: 09-10-2026 (crítica de diseño, ronda 1).
+Marca las casillas a medida que avancemos. Última actualización: 09-10-2026 (crítica de diseño, ronda 2 tanda A).
 
 **En línea:** [woowfy.com](https://woowfy.com) (landing) · [app.woowfy.com](https://app.woowfy.com) (app)
 
@@ -166,9 +166,13 @@ Puntajes (heurísticas de Nielsen): Home 22/40 · flujo cliente 22/40 · comerci
 - [x] Liquidar un local: muestra la cuenta de destino con botones para copiar; sin cuenta no se puede registrar
 - [x] Interruptor de lanzamiento de la landing confirma o avisa si falla
 
-**Ronda 2 — por hacer** (orden sugerido)
-- [ ] Reglas de dinero antes de pagar (15 min, cancelar 2 h antes, sin retiro no hay reembolso) y controles de la Home con texto
-- [ ] Home vacía con salida ("cómo funciona", avísame, publica tu local) y selector de región
+**Ronda 2 — tanda A ✅** (primera visita del cliente; probada en emuladores y desplegada el 09-10)
+- [x] Reglas de dinero antes de pagar (15 min, cancelar 2 h antes, sin retiro no hay reembolso) junto a "Reservar y pagar $X"; la comisión pasa a un plegable
+- [x] Controles de la Home con texto: zona, orden visible y Lista/Mapa arriba; filtros abajo
+- [x] Selector de región (todo Chile o una de las 16, con cuántas bolsas hay); se recuerda en el navegador. La ubicación se explica antes de pedirla y el mapa encuadra las bolsas (ya no supone Santiago)
+- [x] Home vacía con salida: cómo funciona, "Avísame" (lista de espera de woowfy.com) y "¿Tienes un local?" (guía para comercios)
+
+**Ronda 2 — por hacer**
 - [ ] Ingreso con Google dentro de WhatsApp/Instagram (navegador interno) y retomar la reserva después del login
 - [ ] "Modo mostrador" para validar retiros en fila (escaneo continuo, confirmación grande, alerta de "ya retirado")
 - [ ] Landing: hero sin comercios inventados, menos recursos de plantilla, contraste del coral

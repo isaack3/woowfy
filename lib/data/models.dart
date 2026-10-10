@@ -489,6 +489,9 @@ String get storeSharePercent => '${100 - (platformFeeRate * 100).round()}%';
 /// Lo que recibe el local por una venta de [price] (misma cuenta que el servidor).
 int storeShareOf(int price) => price - (price * platformFeeRate).round();
 
+/// Minutos que una bolsa queda reservada mientras el cliente paga (PAYMENT_TIMEOUT_MINUTES en el servidor).
+const paymentTimeoutMinutes = 15;
+
 /// Minutos después de pagar en los que el cliente se puede arrepentir (con reembolso), igual que en el servidor.
 const cancelGraceMinutes = 15;
 

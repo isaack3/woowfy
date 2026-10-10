@@ -227,17 +227,14 @@ class _Detail extends StatelessWidget {
                         if (!bag.soldOut) Text('Quedan ${bag.quantityAvailable}', style: t.labelLarge),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'El local recibe el $storeSharePercent del precio y Woowfy, una comisión de $platformFeePercent por la plataforma.',
-                      style: t.bodySmall?.copyWith(color: WoowfyColors.muted),
-                    ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            if (!bag.soldOut) ...[const SizedBox(height: 12), const _Rules()],
+            const SizedBox(height: 16),
             _ReserveButton(bag: bag),
+            const _FeeSplit(),
             if (bag.storeRatingCount > 0) ...[const SizedBox(height: 24), _Reviews(storeId: bag.storeId)],
             const SizedBox(height: 12),
             Text(
@@ -291,8 +288,66 @@ class _ReserveButtonState extends State<_ReserveButton> {
     return FilledButton(
       style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
       onPressed: soldOut || _busy ? null : _reserve,
-      child: Text(soldOut ? 'Agotada' : (_busy ? 'Reservando…' : 'Reservar y pagar')),
+      child: Text(soldOut ? 'Agotada' : (_busy ? 'Reservando…' : 'Reservar y pagar ${formatClp(widget.bag.price)}')),
     );
+  }
+}
+
+/// Lo que afecta al cliente, dicho antes de pagar: reserva, cancelación y no retiro.
+class _Rules extends StatelessWidget {
+  const _Rules();
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodyMedium;
+    Widget rule(IconData icon, String text) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Icon(icon, size: 18, color: WoowfyColors.green),
+            const SizedBox(width: 10),
+            Expanded(child: Text(text, style: style)),
+          ]),
+        );
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Column(children: [
+          rule(Icons.timer_outlined, 'Te la guardamos $paymentTimeoutMinutes min mientras pagas.'),
+          rule(Icons.undo, 'Puedes cancelar con reembolso hasta $cancelHoursBefore h antes del retiro.'),
+          rule(Icons.info_outline, 'Si no la retiras a tiempo, no hay reembolso: el local ya te la apartó.'),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Cómo se reparte el pago (plegable): transparente, pero sin competir con las reglas.
+class _FeeSplit extends StatefulWidget {
+  const _FeeSplit();
+
+  @override
+  State<_FeeSplit> createState() => _FeeSplitState();
+}
+
+class _FeeSplitState extends State<_FeeSplit> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = Theme.of(context).textTheme.bodySmall?.copyWith(color: WoowfyColors.muted);
+    return Column(children: [
+      TextButton.icon(
+        onPressed: () => setState(() => _open = !_open),
+        icon: Icon(_open ? Icons.expand_less : Icons.expand_more, size: 18),
+        label: const Text('¿Cómo se reparte lo que pagas?'),
+      ),
+      if (_open)
+        Text(
+          'El local recibe el $storeSharePercent del precio y Woowfy, una comisión de $platformFeePercent por la plataforma.',
+          style: muted,
+          textAlign: TextAlign.center,
+        ),
+    ]);
   }
 }
 
