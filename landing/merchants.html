@@ -95,6 +95,8 @@
     .calc .row { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255, 247, 227, .15); }
     .calc .row b { font-size: 1.1rem; }
     .calc .row.total { border: 0; padding-top: 16px; }
+    .calc .warn { display: block; color: #FFB4A3; font-weight: 700; margin: -10px 0 12px; }
+    .calc .warn[hidden] { display: none; }
     .calc .row.total span { color: var(--lime); font-weight: 900; }
     .calc .row.total b { font-size: 1.7rem; color: var(--lime); }
     .calc small { display: block; color: #CFE3D6; margin-top: 10px; }
@@ -271,14 +273,15 @@
              la app, la difusión y la atención a clientes. Si no vendes, no pagas nada.</p>
         </div>
         <div class="money">
-          <div class="calc" aria-live="polite">
+          <div class="calc">
             <h3>Calcula tu venta</h3>
             <label for="price">Precio de oferta de tu bolsa</label>
-            <input id="price" type="number" inputmode="numeric" min="500" step="100" value="3500">
+            <input id="price" type="text" inputmode="numeric" autocomplete="off" value="3.500" aria-describedby="c-warn">
+            <small id="c-warn" class="warn" hidden>El precio mínimo de una bolsa es $500.</small>
             <div class="row"><span>El cliente paga</span><b id="c-price">$3.500</b></div>
             <div class="row"><span>Comisión Woowfy (25%)</span><b id="c-fee">−$875</b></div>
-            <div class="row total"><span>Recibes por bolsa</span><b id="c-you">$2.625</b></div>
-            <small id="c-month">Con 5 bolsas al día, son unos $393.750 al mes por comida que antes se perdía.</small>
+            <div class="row total"><span>Recibes por bolsa</span><b id="c-you" aria-live="polite">$2.625</b></div>
+            <small id="c-month">Por ejemplo, si vendes 5 bolsas al día, son unos $393.750 al mes por comida que antes se perdía.</small>
           </div>
           <div class="card">
             <h3>Qué incluye la comisión</h3>
@@ -447,14 +450,19 @@
     const RATE = 0.25;
     const clp = n => '$' + Math.round(n).toLocaleString('es-CL');
     const input = document.getElementById('price');
+    // Acepta "4.990" o "4990": deja solo dígitos y pone el punto de miles mientras se escribe.
     function calc() {
-      const price = Math.max(0, Math.round(Number(input.value) || 0));
+      const digits = input.value.replace(/\D/g, '').replace(/^0+(?=\d)/, '').slice(0, 7);
+      const price = Number(digits) || 0;
+      const shown = digits ? price.toLocaleString('es-CL') : '';
+      if (input.value !== shown) input.value = shown;
+      document.getElementById('c-warn').hidden = !digits || price >= 500;
       const fee = Math.round(price * RATE);
       document.getElementById('c-price').textContent = clp(price);
       document.getElementById('c-fee').textContent = '−' + clp(fee);
       document.getElementById('c-you').textContent = clp(price - fee);
       document.getElementById('c-month').textContent =
-        'Con 5 bolsas al día, son unos ' + clp((price - fee) * 5 * 30) + ' al mes por comida que antes se perdía.';
+        'Por ejemplo, si vendes 5 bolsas al día, son unos ' + clp((price - fee) * 5 * 30) + ' al mes por comida que antes se perdía.';
     }
     input.addEventListener('input', calc);
     calc();

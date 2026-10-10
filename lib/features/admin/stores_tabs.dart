@@ -78,6 +78,16 @@ class _StoresTabState extends State<StoresTab> {
                     child: const Text('Suspender'),
                   ),
                 ],
+              StoreStatus.suspended => [
+                  OutlinedButton(
+                    onPressed: () => showDialog<void>(context: context, builder: (_) => _PayoutDialog(store: store)),
+                    child: const Text('Liquidar'),
+                  ),
+                  FilledButton.tonal(
+                    onPressed: () => _changeStatus(context, store, StoreStatus.approved),
+                    child: const Text('Activar'),
+                  ),
+                ],
               _ => [
                   FilledButton.tonal(
                     onPressed: () => _changeStatus(context, store, StoreStatus.approved),
@@ -167,7 +177,11 @@ class _StoreCard extends StatelessWidget {
                 stream: Repository.instance.watchBankAccount(store.id),
                 builder: (context, snap) => _Contact(
                   icon: Icons.account_balance_outlined,
-                  text: snap.data?.summary ?? 'Sin datos bancarios',
+                  text: snap.hasError
+                      ? 'No pudimos leer la cuenta bancaria'
+                      : !snap.hasData && snap.connectionState == ConnectionState.waiting
+                          ? 'Cargando cuenta bancaria…'
+                          : snap.data?.summary ?? 'Sin datos bancarios',
                   style: muted,
                 ),
               ),
@@ -439,6 +453,7 @@ class _PayAllBar extends StatelessWidget {
     return StreamBuilder<List<BagOrder>>(
       stream: Repository.instance.watchAllUnpaidOrders(),
       builder: (context, snap) {
+        final loaded = snap.hasData && !snap.hasError;
         final orders = snap.data ?? const <BagOrder>[];
         final stores = orders.map((o) => o.storeId).toSet().length;
         final amount = orders.fold<int>(0, (s, o) => s + o.storeAmount);
@@ -452,17 +467,21 @@ class _PayAllBar extends StatelessWidget {
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text('Por pagar a los locales', style: t.bodySmall),
-                      Text(formatClp(amount), style: t.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                      Text(loaded ? formatClp(amount) : '…', style: t.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
                       Text(
-                        orders.isEmpty
-                            ? 'Todo liquidado.'
-                            : '${orders.length} ${orders.length == 1 ? 'venta' : 'ventas'} de $stores ${stores == 1 ? 'local' : 'locales'}',
+                        snap.hasError
+                            ? 'No pudimos calcular el monto. Recarga la página.'
+                            : !loaded
+                                ? 'Calculando…'
+                                : orders.isEmpty
+                                    ? 'Todo liquidado.'
+                                    : '${orders.length} ${orders.length == 1 ? 'venta' : 'ventas'} de $stores ${stores == 1 ? 'local' : 'locales'}',
                         style: t.bodySmall,
                       ),
                     ]),
                   ),
                   FilledButton(
-                    onPressed: orders.isEmpty
+                    onPressed: !loaded || orders.isEmpty
                         ? null
                         : () => showDialog<void>(
                             context: context,

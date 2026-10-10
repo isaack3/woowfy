@@ -212,12 +212,44 @@
   .wq-res h2{margin:0;font-size:28px;font-weight:900;line-height:1.15}
   .wq-res p{margin:0;font-size:18px;line-height:1.4}
   .wq-ok .wq-detail{color:#9BE52C;font-weight:700}
+  .wq-res .wq-kicker{font-size:15px;font-weight:700;letter-spacing:.04em;opacity:.85}
   .wq-res .wq-btn{margin-top:20px;min-width:240px}
   .wq-white{background:#fff;color:#B83A22}
   .wq-manual{display:flex;gap:8px;justify-content:center}
   .wq-manual input{width:150px;border:0;border-radius:999px;padding:14px 18px;font:inherit;font-size:18px;font-weight:900;letter-spacing:4px;text-transform:uppercase;text-align:center}`;
 
+  let audio = null;
+  function unlockAudio() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      if (!audio) audio = new Ctx();
+      if (audio.state === 'suspended') audio.resume();
+    } catch (e) { audio = null; }
+  }
+  // ok: un tono agudo y corto. No ok: dos tonos graves.
+  function beep(ok) {
+    if (!audio) return;
+    try {
+      const notes = ok ? [[880, 0, 0.14]] : [[220, 0, 0.18], [220, 0.26, 0.18]];
+      for (const [freq, at, len] of notes) {
+        const osc = audio.createOscillator();
+        const gain = audio.createGain();
+        osc.type = ok ? 'sine' : 'square';
+        osc.frequency.value = freq;
+        const t0 = audio.currentTime + at;
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.exponentialRampToValueAtTime(0.25, t0 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + len);
+        osc.connect(gain).connect(audio.destination);
+        osc.start(t0);
+        osc.stop(t0 + len + 0.02);
+      }
+    } catch (e) { /* sin sonido no pasa nada */ }
+  }
+
   function counter(opts) {
+    unlockAudio();
     const validate = opts && opts.validate;
     let pending = (opts && typeof opts.pending === 'number') ? opts.pending : null;
     return new Promise((resolve) => {
@@ -254,7 +286,7 @@
             <button type="button" class="wq-btn wq-lime" data-a="retry">Reintentar</button>
             <button type="button" class="wq-btn wq-ghost" data-a="type">Escribir el código</button></div>
           <div class="wq-res wq-ok" data-m="ok" hidden role="status" aria-live="assertive">
-            <div class="wq-icon" aria-hidden="true">✓</div><h2 data-title></h2><p class="wq-detail" data-detail></p>
+            <div class="wq-icon" aria-hidden="true">✓</div><p class="wq-kicker">Entrega</p><h2 data-title></h2><p class="wq-detail" data-detail></p>
             <p data-left></p>
             <button type="button" class="wq-btn wq-lime" data-a="next">Siguiente cliente</button></div>
           <div class="wq-res wq-bad" data-m="bad" hidden role="alert">
@@ -316,6 +348,7 @@
       }
       document.addEventListener('keydown', onKey);
       root.addEventListener('click', (e) => {
+        unlockAudio(); // en iPhone el audio solo se habilita con un toque
         const a = e.target.closest('[data-a]');
         if (!a) return;
         if (a.dataset.a === 'close') finish();
@@ -346,7 +379,7 @@
         try {
           r = await validate(code);
         } catch (err) {
-          r = { ok: false, title: 'No se pudo validar', detail: 'Revisa tu conexión e intenta de nuevo.' };
+          r = { ok: false, title: 'No se pudo validar', detail: 'Revisa tu conexión e intenta de nuevo.', retry: true };
         }
         loading.hidden = true;
         loading.querySelector('[data-lt]').textContent = 'Abriendo la cámara…';
@@ -354,6 +387,9 @@
         const box = r && r.ok ? okBox : badBox;
         box.querySelector('[data-title]').textContent = (r && r.title) || '';
         box.querySelector('[data-detail]').textContent = (r && r.detail) || '';
+        // Error de conexión: el mismo QR se puede volver a leer apenas se toque "Entendido".
+        if (r && r.retry) lastCode = null;
+        beep(!!(r && r.ok));
         if (r && r.ok) {
           if (pending !== null && pending > 0) pending -= 1;
           renderCount();

@@ -20,7 +20,7 @@ Future<void> openCounter(BuildContext context, {int? pending}) async {
 Future<CounterResult> _validate(String code) async {
   try {
     final r = await Repository.instance.redeemOrder(code);
-    return (ok: true, title: 'Entrega: ${r.bagTitle}', detail: 'Pagado ${formatClp(r.amount)}');
+    return (ok: true, title: '1 × ${r.bagTitle}', detail: 'El cliente ya pagó ${formatClp(r.amount)} en línea', retry: false);
   } catch (e) {
     // Código inválido, ya retirado o fuera de horario: hay que frenar la entrega. Lo demás es conexión.
     final stop = e is FirebaseFunctionsException &&
@@ -29,6 +29,7 @@ Future<CounterResult> _validate(String code) async {
       ok: false,
       title: stop ? 'No entregues' : 'No se pudo validar',
       detail: friendlyError(e, fallback: 'Revisa tu conexión e intenta de nuevo.'),
+      retry: !stop,
     );
   }
 }

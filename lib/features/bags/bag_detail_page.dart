@@ -11,6 +11,7 @@ import '../../core/format.dart';
 import '../../core/theme.dart';
 import '../../data/models.dart';
 import '../../data/repository.dart';
+import '../orders/countdown.dart';
 import 'bag_image.dart';
 import 'stars.dart';
 
@@ -237,7 +238,7 @@ class _Detail extends StatelessWidget {
             ),
             if (!bag.soldOut) ...[const SizedBox(height: 12), const _Rules()],
             const SizedBox(height: 16),
-            if (resume && !bag.soldOut) _ResumeReserve(bag: bag) else _ReserveButton(bag: bag),
+            _PendingOr(bag: bag, child: resume && !bag.soldOut ? _ResumeReserve(bag: bag) : _ReserveButton(bag: bag)),
             const _FeeSplit(),
             if (bag.storeRatingCount > 0) ...[const SizedBox(height: 24), _Reviews(storeId: bag.storeId)],
             const SizedBox(height: 12),
@@ -249,6 +250,58 @@ class _Detail extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Si la persona ya reservó esta bolsa y no ha pagado (p. ej. volvió atrás desde el pago), en vez de reservar otra
+/// vez muestra la reserva vigente con su reloj y "Completar pago".
+class _PendingOr extends StatelessWidget {
+  const _PendingOr({required this.bag, required this.child});
+
+  final Bag bag;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return child;
+    return StreamBuilder<List<BagOrder>>(
+      stream: Repository.instance.watchMyOrders(uid),
+      builder: (context, snap) {
+        final now = DateTime.now();
+        final pending = (snap.data ?? const <BagOrder>[]).where((o) =>
+            o.bagId == bag.id &&
+            o.status == OrderStatus.pendingPayment &&
+            o.expiresAt != null &&
+            o.expiresAt!.isAfter(now));
+        if (pending.isEmpty) return child;
+        final order = pending.first;
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(color: WoowfyColors.orangeSoft, borderRadius: BorderRadius.circular(18)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              const Icon(Icons.timer_outlined, color: WoowfyColors.green),
+              const SizedBox(width: 8),
+              Expanded(child: Text('Ya tienes esta bolsa reservada', style: Theme.of(context).textTheme.titleSmall)),
+            ]),
+            const SizedBox(height: 10),
+            Countdown(
+              until: order.expiresAt!,
+              builder: (context, left) => FilledButton(
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                onPressed: left == Duration.zero
+                    ? null
+                    : () => order.checkoutUrl != null
+                        ? openCheckout(context, order.checkoutUrl!)
+                        : context.go('/order/${order.id}'),
+                child: Text(left == Duration.zero ? 'La reserva venció' : 'Completar pago · quedan ${formatMmSs(left)}'),
+              ),
+            ),
+          ]),
+        );
+      },
     );
   }
 }
@@ -357,9 +410,9 @@ class _Rules extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Column(children: [
-          rule(Icons.timer_outlined, 'Te la guardamos $paymentTimeoutMinutes min mientras pagas.'),
-          rule(Icons.undo, 'Puedes cancelar con reembolso hasta $cancelHoursBefore h antes del retiro.'),
-          rule(Icons.info_outline, 'Si no la retiras a tiempo, no hay reembolso: el local ya te la apartó.'),
+          rule(Icons.timer_outlined, ruleHold),
+          rule(Icons.undo, ruleCancel),
+          rule(Icons.info_outline, ruleNoShow),
         ]),
       ),
     );

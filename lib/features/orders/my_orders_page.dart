@@ -9,6 +9,7 @@ import '../../data/models.dart';
 import '../../data/repository.dart';
 import '../bags/bag_image.dart';
 import '../shell/app_shell.dart';
+import 'countdown.dart';
 
 class MyOrdersPage extends StatelessWidget {
   const MyOrdersPage({super.key});
@@ -89,7 +90,14 @@ class _OrderTile extends StatelessWidget {
               ),
               o.status == OrderStatus.pickedUp && o.rating == null
                   ? const _RatePill()
-                  : OrderStatusPill(o.status),
+                  : o.status == OrderStatus.pendingPayment && o.expiresAt != null
+                      ? Countdown(
+                          until: o.expiresAt!,
+                          builder: (context, left) => left == Duration.zero
+                              ? OrderStatusPill(o.status)
+                              : OrderStatusPill(o.status, label: 'Pagar en ${formatMmSs(left)}'),
+                        )
+                      : OrderStatusPill(o.status),
             ],
           ),
         ),
@@ -100,9 +108,12 @@ class _OrderTile extends StatelessWidget {
 
 /// Estado del pedido con el color de la marca.
 class OrderStatusPill extends StatelessWidget {
-  const OrderStatusPill(this.status, {super.key});
+  const OrderStatusPill(this.status, {super.key, this.label});
 
   final OrderStatus status;
+
+  /// Texto en vez del nombre del estado (p. ej. "Pagar en 12:34").
+  final String? label;
 
   @override
   Widget build(BuildContext context) {
@@ -116,7 +127,7 @@ class OrderStatusPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: ShapeDecoration(color: bg, shape: const StadiumBorder()),
-      child: Text(status.label, style: TextStyle(color: fg, fontWeight: FontWeight.w800, fontSize: 12)),
+      child: Text(label ?? status.label, style: TextStyle(color: fg, fontWeight: FontWeight.w800, fontSize: 12)),
     );
   }
 }

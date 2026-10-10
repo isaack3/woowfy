@@ -7,6 +7,9 @@ final _shortDate = DateFormat('EEE d MMM', 'es_CL');
 /// Formato chileno: $3.490
 String formatClp(int amount) => '\$${_thousands.format(amount)}';
 
+/// "16:00".
+String formatTime(DateTime t) => _hour.format(t);
+
 String formatPickupWindow(DateTime start, DateTime end) =>
     '${_hour.format(start)} – ${_hour.format(end)}';
 

@@ -1,14 +1,15 @@
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../core/checkout.dart';
+import '../../core/errors.dart';
 import '../../core/format.dart';
 import '../../core/theme.dart';
 import '../bags/stars.dart';
 import '../../data/models.dart';
 import '../../data/repository.dart';
+import 'countdown.dart';
 
 /// Comprobante del pedido. Cuando está pagado muestra el QR/código que el
 /// cliente presenta en el local para retirar su bolsa.
@@ -24,12 +25,24 @@ class OrderPage extends StatelessWidget {
         title: const Text('Tu pedido'),
         leading: BackButton(onPressed: () => context.go('/orders')),
       ),
-      body: StreamBuilder<BagOrder?>(
+      body: Reloadable(builder: (context) => StreamBuilder<BagOrder?>(
         stream: Repository.instance.watchOrder(orderId),
         builder: (context, snap) {
-          if (snap.hasError) return const Center(child: Text('No pudimos cargar el pedido.'));
+          if (snap.hasError) return ErrorRetry(title: 'No pudimos cargar el pedido', error: snap.error);
+          if (snap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
           final order = snap.data;
-          if (order == null) return const Center(child: CircularProgressIndicator());
+          if (order == null) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  const Text('No encontramos este pedido.', textAlign: TextAlign.center),
+                  const SizedBox(height: 12),
+                  FilledButton(onPressed: () => context.go('/orders'), child: const Text('Ver mis pedidos')),
+                ]),
+              ),
+            );
+          }
           return Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 480),
@@ -40,7 +53,7 @@ class OrderPage extends StatelessWidget {
             ),
           );
         },
-      ),
+      )),
     );
   }
 }
@@ -72,8 +85,7 @@ class _Body extends StatelessWidget {
       case OrderStatus.paid:
         final deadline = order.cancelDeadline;
         final canCancel = DateTime.now().isBefore(deadline);
-        final deadlineText =
-            '${deadline.hour.toString().padLeft(2, '0')}:${deadline.minute.toString().padLeft(2, '0')}';
+        final deadlineText = '${formatPickupDay(deadline)} a las ${formatTime(deadline)}';
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -90,15 +102,25 @@ class _Body extends StatelessWidget {
             const SizedBox(height: 24),
             if (canCancel) ...[
               Text(
-                'Puedes cancelar con reembolso hasta las $deadlineText.',
+                'Puedes cancelar con reembolso hasta $deadlineText.',
                 textAlign: TextAlign.center,
                 style: t.bodySmall?.copyWith(color: WoowfyColors.muted),
               ),
-              TextButton.icon(
-                onPressed: () => _cancel(context, paid: true),
-                icon: const Icon(Icons.cancel_outlined),
-                label: const Text('Cancelar pedido'),
-                style: TextButton.styleFrom(foregroundColor: scheme.error),
+              const SizedBox(height: 32),
+              Theme(
+                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  title: Text('Más opciones', style: t.bodyMedium?.copyWith(color: WoowfyColors.muted)),
+                  tilePadding: EdgeInsets.zero,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () => _cancel(context, paid: true),
+                      icon: const Icon(Icons.cancel_outlined),
+                      label: const Text('Cancelar pedido'),
+                      style: TextButton.styleFrom(foregroundColor: scheme.error),
+                    ),
+                  ],
+                ),
               ),
             ] else
               Text(
@@ -114,14 +136,29 @@ class _Body extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             header,
-            const Text(
-              'Tu bolsa está reservada por 15 minutos mientras completas el pago.',
-            ),
+            if (order.expiresAt != null)
+              Countdown(
+                until: order.expiresAt!,
+                builder: (context, left) => Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(color: WoowfyColors.orangeSoft, borderRadius: BorderRadius.circular(16)),
+                  child: Column(children: [
+                    Text(left == Duration.zero ? 'La reserva venció' : 'Te la guardamos por',
+                        style: t.bodyMedium?.copyWith(color: WoowfyColors.muted)),
+                    if (left > Duration.zero)
+                      Text(formatMmSs(left),
+                          style: t.headlineMedium?.copyWith(
+                              color: WoowfyColors.green, fontFeatures: const [FontFeature.tabularFigures()])),
+                  ]),
+                ),
+              )
+            else
+              const Text('Tu bolsa está reservada por $paymentTimeoutMinutes minutos mientras completas el pago.'),
             const SizedBox(height: 16),
             if (order.checkoutUrl != null)
               FilledButton(
                 onPressed: () => openCheckout(context, order.checkoutUrl!),
-                child: const Text('Completar pago'),
+                child: Text('Completar pago ${formatClp(order.amount)}'),
               ),
             _VerifyPayment(orderId: order.id),
             TextButton(
@@ -251,9 +288,9 @@ class _Body extends StatelessWidget {
           ),
         ),
       );
-    } on FirebaseFunctionsException catch (e) {
+    } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text(e.message ?? 'No se pudo cancelar.')),
+        SnackBar(content: Text(friendlyError(e, fallback: 'No se pudo cancelar. Intenta de nuevo.'))),
       );
     }
   }
@@ -432,9 +469,9 @@ class _RateCardState extends State<_RateCard> {
           content: Text('¡Gracias! Tu calificación ayuda a otros a elegir.'),
         ),
       );
-    } on FirebaseFunctionsException catch (e) {
+    } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text(e.message ?? 'No se pudo enviar.')),
+        SnackBar(content: Text(friendlyError(e, fallback: 'No se pudo enviar. Intenta de nuevo.'))),
       );
       if (mounted) setState(() => _sending = false);
     }

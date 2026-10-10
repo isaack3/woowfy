@@ -8,7 +8,8 @@ external JSPromise<JSString?> _scan();
 external JSPromise<JSAny?> _counter(JSObject options);
 
 /// Resultado de validar un código en el modo mostrador.
-typedef CounterResult = ({bool ok, String title, String detail});
+/// [retry]: el problema fue de conexión, así que el mismo QR se puede volver a leer de inmediato.
+typedef CounterResult = ({bool ok, String title, String detail, bool retry});
 
 /// Escáner de QR de web/qr_scanner.js: una capa HTML sobre la app que funciona en Safari de iPhone.
 class WebQr {
@@ -31,7 +32,7 @@ class WebQr {
     options.setProperty(
       'validate'.toJS,
       ((JSString code) => validate(code.toDart)
-          .then((r) => {'ok': r.ok, 'title': r.title, 'detail': r.detail}.jsify())
+          .then((r) => {'ok': r.ok, 'title': r.title, 'detail': r.detail, 'retry': r.retry}.jsify())
           .toJS).toJS,
     );
     try {

@@ -1,7 +1,7 @@
 # Woowfy — Hoja de ruta
 
 Marketplace de bolsas sorpresa contra el desperdicio de comida. Chile primero, luego Latam.
-Marca las casillas a medida que avancemos. Última actualización: 09-10-2026 (crítica de diseño, ronda 2 completa).
+Marca las casillas a medida que avancemos. Última actualización: 10-10-2026 (ronda 3: confianza con el dinero).
 
 **En línea:** [woowfy.com](https://woowfy.com) (landing) · [app.woowfy.com](https://app.woowfy.com) (app)
 
@@ -185,6 +185,20 @@ Puntajes (heurísticas de Nielsen): Home 22/40 · flujo cliente 22/40 · comerci
 - [x] Sin etiquetas sobre los títulos (home y /merchants), sin cinta animada, íconos en vez de emojis, "1/3" como frase con su fuente, secciones que ya no parten invisibles
 - [x] Coral oscuro (#B83A22) para texto y etiquetas (contraste AA); círculo lima de /merchants ya no tapa el título en celular
 - [x] Guía para comercios al día con el modo mostrador
+
+**Segunda crítica (10-10):** Home 26/40 (antes 22) · cliente 23 (22) · comercio 25 (22) · admin 26 (23) · landing 21/32 (20) · detector en woowfy.com 10 hallazgos (21).
+
+**Ronda 3 — confianza con el dinero ✅** (probada en emuladores y desplegada el 10-10)
+- [x] Portada: "El local recibe $2.617" (misma cuenta que el servidor)
+- [x] Nunca un $0 falso: esqueleto mientras carga y "Reintentar" si falla (Por recibir, Pagos recibidos, Por pagar del admin, cuenta bancaria)
+- [x] "Por recibir" con "Ver detalle" de las ventas que lo componen
+- [x] Calculadora de /merchants acepta "4.990", pone los puntos y avisa bajo $500
+- [x] Reserva pendiente con reloj: en el comprobante, "Pagar en mm:ss" en Mis pedidos y "Ya tienes esta bolsa reservada · Completar pago" en el detalle
+- [x] Reglas iguales en todas partes (incluye los 15 min después de pagar y 1 h después del horario) y plazo con día ("hasta hoy a las 16:00")
+- [x] "Cancelar pedido" bajo "Más opciones", lejos del QR; errores legibles al cancelar y calificar; pedido inexistente con salida
+- [x] Mostrador: "Entrega · 1 × {bolsa}" y "El cliente ya pagó $X en línea"; tono corto (también en iPhone); reintento inmediato tras un error de red
+- [x] Admin: liquidar también locales suspendidos
+- [x] RUT de la cuenta bancaria validado (dígito verificador) y guardado con formato
 
 ### Próximo (por decidir)
 - [ ] Empleados por local, reclamos y moderación de opiniones, invitar amigos (referidos)

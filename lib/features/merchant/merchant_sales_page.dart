@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/errors.dart';
 import '../../core/format.dart';
+import '../../core/rut.dart';
 import '../../core/theme.dart';
 import '../../data/models.dart';
 import '../../data/repository.dart';
@@ -71,25 +72,44 @@ class MerchantSalesPage extends StatelessWidget {
 }
 
 /// Saldo por cobrar: ventas cerradas (retiradas o no retiradas por el cliente) que Woowfy aún no le paga.
-class _Pending extends StatelessWidget {
+/// Mientras carga o si falla, nunca muestra $0: un monto falso en la pantalla de plata es lo peor que puede pasar.
+class _Pending extends StatefulWidget {
   const _Pending({required this.storeId});
 
   final String storeId;
 
   @override
+  State<_Pending> createState() => _PendingState();
+}
+
+class _PendingState extends State<_Pending> {
+  late Stream<List<BagOrder>> _orders = Repository.instance.watchUnpaidOrders(widget.storeId);
+  bool _open = false;
+
+  @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
+    final cream = t.bodySmall?.copyWith(color: WoowfyColors.cream);
     return StreamBuilder<List<BagOrder>>(
-      stream: Repository.instance.watchUnpaidOrders(storeId),
+      stream: _orders,
       builder: (context, snap) {
-        final orders = snap.data ?? const <BagOrder>[];
-        final amount = orders.fold<int>(0, (s, o) => s + o.storeAmount);
-        return Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(color: WoowfyColors.green, borderRadius: BorderRadius.circular(20)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Por recibir', style: t.titleMedium?.copyWith(color: WoowfyColors.lime)),
-            const SizedBox(height: 4),
+        final orders = snap.data;
+        final Widget body;
+        if (snap.hasError) {
+          body = Row(children: [
+            Expanded(child: Text('No pudimos cargar el monto. Revisa tu conexión.', style: cream)),
+            TextButton(
+              onPressed: () => setState(() => _orders = Repository.instance.watchUnpaidOrders(widget.storeId)),
+              style: TextButton.styleFrom(foregroundColor: WoowfyColors.lime),
+              child: const Text('Reintentar'),
+            ),
+          ]);
+        } else if (orders == null) {
+          body = const _Skeleton(color: Color(0x33FFF7E3));
+        } else {
+          final amount = orders.fold<int>(0, (s, o) => s + o.storeAmount);
+          final sorted = [...orders]..sort((a, b) => b.pickupStart.compareTo(a.pickupStart));
+          body = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(formatClp(amount), style: t.headlineLarge?.copyWith(color: WoowfyColors.cream)),
             const SizedBox(height: 4),
             Text(
@@ -97,11 +117,65 @@ class _Pending extends StatelessWidget {
                   ? 'No tienes ventas pendientes de pago.'
                   : '${orders.length} ${orders.length == 1 ? 'venta' : 'ventas'} aún sin liquidar (ya descontada la comisión). '
                       'Las bolsas que el cliente no retira también se te pagan.',
-              style: t.bodySmall?.copyWith(color: WoowfyColors.cream),
+              style: cream,
             ),
+            if (orders.isNotEmpty) ...[
+              TextButton.icon(
+                onPressed: () => setState(() => _open = !_open),
+                style: TextButton.styleFrom(foregroundColor: WoowfyColors.lime, padding: EdgeInsets.zero),
+                icon: Icon(_open ? Icons.expand_less : Icons.expand_more, size: 18),
+                label: Text(_open ? 'Ocultar detalle' : 'Ver detalle'),
+              ),
+              if (_open)
+                for (final o in sorted)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Row(children: [
+                      Expanded(
+                        child: Text(
+                          '${formatPickupDay(o.pickupStart)} · ${o.bagTitle}'
+                          '${o.status == OrderStatus.noShow ? ' (no retirada)' : ''}',
+                          style: cream,
+                        ),
+                      ),
+                      Text(formatClp(o.storeAmount), style: cream?.copyWith(fontWeight: FontWeight.w700)),
+                    ]),
+                  ),
+            ],
+          ]);
+        }
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(color: WoowfyColors.green, borderRadius: BorderRadius.circular(20)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Por recibir', style: t.titleMedium?.copyWith(color: WoowfyColors.lime)),
+            const SizedBox(height: 4),
+            body,
           ]),
         );
       },
+    );
+  }
+}
+
+/// Barras grises mientras carga un monto (en vez de mostrar $0).
+class _Skeleton extends StatelessWidget {
+  const _Skeleton({this.color = const Color(0xFFEFE6CF)});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget bar(double w, double h) => Container(
+          width: w,
+          height: h,
+          margin: const EdgeInsets.only(top: 8),
+          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(6)),
+        );
+    return Semantics(
+      label: 'Cargando',
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [bar(140, 30), bar(220, 12)]),
     );
   }
 }
@@ -198,7 +272,7 @@ class _Payouts extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    return StreamBuilder<List<Payout>>(
+    return Reloadable(builder: (context) => StreamBuilder<List<Payout>>(
       stream: Repository.instance.watchPayouts(storeId),
       builder: (context, snap) {
         final payouts = snap.data ?? const <Payout>[];
@@ -207,7 +281,12 @@ class _Payouts extends StatelessWidget {
           children: [
             Text('Pagos recibidos', style: t.titleMedium),
             const SizedBox(height: 8),
-            if (payouts.isEmpty) Text('Aún no hay pagos registrados.', style: t.bodyMedium?.copyWith(color: WoowfyColors.muted)),
+            if (snap.hasError)
+              ErrorRetry(title: 'No pudimos cargar tus pagos', error: snap.error)
+            else if (!snap.hasData)
+              const _Skeleton()
+            else if (payouts.isEmpty)
+              Text('Aún no hay pagos registrados.', style: t.bodyMedium?.copyWith(color: WoowfyColors.muted)),
             for (final p in payouts)
               Card(
                 child: ListTile(
@@ -224,7 +303,7 @@ class _Payouts extends StatelessWidget {
           ],
         );
       },
-    );
+    ));
   }
 }
 
@@ -511,7 +590,7 @@ class _BankDialogState extends State<_BankDialog> {
         widget.storeId,
         BankAccount(
           holder: _holder.text.trim(),
-          rut: _rut.text.trim(),
+          rut: normalizeRut(_rut.text) ?? _rut.text.trim(),
           bank: _bank.text.trim(),
           accountType: _type,
           accountNumber: _number.text.replaceAll(RegExp(r'\s'), ''),
@@ -551,7 +630,11 @@ class _BankDialogState extends State<_BankDialog> {
               TextFormField(
                 controller: _rut,
                 decoration: const InputDecoration(labelText: 'RUT del titular', hintText: '12.345.678-9'),
-                validator: _required,
+                validator: (v) => (v ?? '').trim().isEmpty
+                    ? 'Campo obligatorio'
+                    : normalizeRut(v!) == null
+                        ? 'RUT no válido: revisa los números y el dígito verificador.'
+                        : null,
               ),
               TextFormField(
                 controller: _bank,

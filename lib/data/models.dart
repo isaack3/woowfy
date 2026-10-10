@@ -230,6 +230,7 @@ class BagOrder {
     this.payoutId,
     this.createdAt,
     this.paidAt,
+    this.expiresAt,
   });
 
   final String id;
@@ -255,6 +256,9 @@ class BagOrder {
   final String? payoutId;
   final DateTime? createdAt;
   final DateTime? paidAt;
+
+  /// Hasta cuándo se guarda la reserva sin pagar (solo en pendiente de pago).
+  final DateTime? expiresAt;
   final String address;
   final String comuna;
   final String bagTitle;
@@ -292,6 +296,7 @@ class BagOrder {
       payoutId: d['payoutId'] as String?,
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
       paidAt: (d['paidAt'] as Timestamp?)?.toDate(),
+      expiresAt: (d['expiresAt'] as Timestamp?)?.toDate(),
     );
   }
 
@@ -491,6 +496,16 @@ int storeShareOf(int price) => price - (price * platformFeeRate).round();
 
 /// Minutos que una bolsa queda reservada mientras el cliente paga (PAYMENT_TIMEOUT_MINUTES en el servidor).
 const paymentTimeoutMinutes = 15;
+
+/// Minutos después del fin del horario en que aún se puede retirar; después queda "No retirado" (REDEEM_GRACE_MINUTES).
+const noShowGraceMinutes = 60;
+
+/// Reglas para el cliente, con el mismo texto en el detalle de la bolsa y en el comprobante.
+String get ruleHold => 'Te la guardamos $paymentTimeoutMinutes min mientras pagas.';
+String get ruleCancel =>
+    'Puedes cancelar con reembolso hasta $cancelHoursBefore h antes del retiro, o en los $cancelGraceMinutes min después de pagar.';
+String get ruleNoShow =>
+    'Si no la retiras hasta ${noShowGraceMinutes ~/ 60} h después del horario, no hay reembolso: el local ya te la apartó.';
 
 /// Minutos después de pagar en los que el cliente se puede arrepentir (con reembolso), igual que en el servidor.
 const cancelGraceMinutes = 15;
