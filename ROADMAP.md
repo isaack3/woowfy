@@ -1,7 +1,7 @@
 # Woowfy — Hoja de ruta
 
 Marketplace de bolsas sorpresa contra el desperdicio de comida. Chile primero, luego Latam.
-Marca las casillas a medida que avancemos. Última actualización: 10-10-2026 (ronda 8, tanda 1).
+Marca las casillas a medida que avancemos. Última actualización: 10-10-2026 (ronda 8, tanda 2).
 
 **En línea:** [woowfy.com](https://woowfy.com) (landing) · [app.woowfy.com](https://app.woowfy.com) (app)
 
@@ -242,6 +242,13 @@ Puntajes (heurísticas de Nielsen): Home 22/40 · flujo cliente 22/40 · comerci
 - [x] Pantalla de carga con la marca mientras baja la app (antes, 3–5 s en blanco)
 - [x] Semántica de Flutter activada desde el inicio (lectores de pantalla sin botón oculto)
 - [x] Landing sin frases que suponen comercios existentes ("las bolsas vuelan", "los locales cuentan con…")
+
+**Ronda 8, tanda 2 — cliente ✅** (desplegada el 10-10)
+- [x] Home sin bolsas: título honesto ("Rescata comida en todo Chile") y lista de espera dentro de la app (sin salir a la landing; con sesión, nombre y correo ya escritos)
+- [x] La función de lista de espera acepta envíos desde app.woowfy.com
+- [x] Tarjeta de bolsa: comuna y región en su propia línea (antes se cortaba al final)
+- [x] Pedido pagado: "¡Es tuya!" con lo pagado y lo ahorrado, "Cómo llegar" bajo el horario y ayuda con el pedido ya identificado (hola@passva.com)
+- [x] Esperando pago: "Confirmando tu pago…" se revisa solo cada 15 s durante 1 minuto; cancelar queda abajo y discreto
 
 ### Próximo (por decidir)
 - [ ] Empleados por local, reclamos y moderación de opiniones, invitar amigos (referidos)

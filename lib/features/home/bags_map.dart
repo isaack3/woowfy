@@ -96,7 +96,7 @@ class BagsMap extends StatelessWidget {
           heightFactor: 1,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 380),
-            child: SizedBox(height: 290, child: BagCard(bag: bag, distance: d == null ? null : formatDistance(d))),
+            child: SizedBox(height: 310, child: BagCard(bag: bag, distance: d == null ? null : formatDistance(d))),
           ),
         ),
       ),

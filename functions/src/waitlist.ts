@@ -15,6 +15,9 @@ export const joinWaitlist = onRequest({
   cors: [
     /^https:\/\/(www\.)?woowfy\.com$/,
     /^https:\/\/woowfy-app\.(web\.app|firebaseapp\.com)$/,
+    // La app (app.woowfy.com) también inscribe en la lista de espera desde la Home sin bolsas.
+    /^https:\/\/app\.woowfy\.com$/,
+    /^https:\/\/woowfy-app-web\.(web\.app|firebaseapp\.com)$/,
     /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,
   ],
 }, async (req, res) => {

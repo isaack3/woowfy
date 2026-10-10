@@ -52,7 +52,20 @@ class BagCard extends StatelessWidget {
                     RatingBadge(avg: bag.storeRatingAvg, count: bag.storeRatingCount),
                   ]),
                   const SizedBox(height: 4),
-                  Text([bag.title, bag.category, bag.comuna].whereType<String>().where((s) => s.isNotEmpty).join(' · '), style: t.bodySmall?.copyWith(color: WoowfyColors.muted), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text([bag.title, bag.category].whereType<String>().where((s) => s.isNotEmpty).join(' · '), style: t.bodySmall?.copyWith(color: WoowfyColors.muted), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  if ([bag.comuna, bag.region].any((s) => s.isNotEmpty))
+                    Row(children: [
+                      const Icon(Icons.place_outlined, size: 14, color: WoowfyColors.green),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          [bag.comuna, bag.region.replaceFirst(' de Santiago', '')].where((s) => s.isNotEmpty).join(', '),
+                          style: t.bodySmall?.copyWith(color: WoowfyColors.green, fontWeight: FontWeight.w700),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ]),
                   const SizedBox(height: 2),
                   Row(children: [
                     const Icon(Icons.schedule, size: 14, color: WoowfyColors.muted),

@@ -15,6 +15,7 @@ import '../../data/repository.dart';
 import '../bags/bag_card.dart';
 import '../shell/app_shell.dart';
 import 'bags_map.dart';
+import 'waitlist_form.dart';
 
 enum _Sort {
   soonest('Retiro más próximo'),
@@ -35,9 +36,6 @@ class HomePage extends StatefulWidget {
 /// Clave donde se recuerda la región elegida (en el navegador o el teléfono).
 const _regionKey = 'home.region';
 
-/// Lista de espera de woowfy.com, con la región ya elegida si la hay.
-String _waitlistUrl(String? region) =>
-    region == null ? 'https://woowfy.com/#waitlist' : 'https://woowfy.com/?region=${Uri.encodeComponent(region)}#waitlist';
 const _merchantsGuideUrl = 'https://woowfy.com/merchants';
 
 class _HomePageState extends State<HomePage> {
@@ -241,7 +239,8 @@ class _HomePageState extends State<HomePage> {
               slivers: [
                 SliverToBoxAdapter(
                   child: GreenHeader(
-                    title: 'Bolsas disponibles',
+                    // Con 0 bolsas el título no promete lo que no hay.
+                    title: available == 0 ? 'Rescata comida en todo Chile' : 'Bolsas disponibles',
                     subtitle: subtitle,
                   ),
                 ),
@@ -335,7 +334,7 @@ class _HomePageState extends State<HomePage> {
                         gridDelegate:
                             SliverGridDelegateWithMaxCrossAxisExtent(
                               maxCrossAxisExtent: 360,
-                              mainAxisExtent: 284 + _extraCardHeight(context),
+                              mainAxisExtent: 304 + _extraCardHeight(context),
                               crossAxisSpacing: 16,
                               mainAxisSpacing: 16,
                             ),
@@ -657,17 +656,11 @@ class _EmptyHome extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               if (onAllChile != null) ...[
-                FilledButton(onPressed: onAllChile, child: const Text('Ver bolsas de todo Chile')),
-                const SizedBox(height: 8),
-                OutlinedButton(
-                  onPressed: () => launchUrl(Uri.parse(_waitlistUrl(region))),
-                  child: Text(region == null ? 'Avísame cuando haya bolsas' : 'Avísame cuando haya bolsas en $region'),
-                ),
-              ] else
-                FilledButton(
-                  onPressed: () => launchUrl(Uri.parse(_waitlistUrl(region))),
-                  child: Text(region == null ? 'Avísame cuando haya bolsas' : 'Avísame cuando haya bolsas en $region'),
-                ),
+                OutlinedButton(onPressed: onAllChile, child: const Text('Ver bolsas de todo Chile')),
+                const SizedBox(height: 16),
+              ],
+              // El aviso se pide aquí mismo (antes llevaba a woowfy.com y se perdía el contexto).
+              WaitlistForm(region: region),
               const SizedBox(height: 12),
               Wrap(
                 alignment: WrapAlignment.center,

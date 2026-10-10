@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/checkout.dart';
 import '../../core/errors.dart';
@@ -85,7 +87,7 @@ class _Body extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(order.storeName, style: t.headlineSmall),
-        Text('${order.address}, ${order.comuna}'),
+        Text([order.address, order.comuna].where((s) => s.isNotEmpty).join(', ')),
         const SizedBox(height: 4),
         Text('${order.bagTitle} · ${formatClp(order.amount)}'),
         const SizedBox(height: 16),
@@ -100,6 +102,10 @@ class _Body extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (order.paidAt != null && DateTime.now().difference(order.paidAt!).inMinutes < 30) ...[
+              _JustPaid(order: order),
+              const SizedBox(height: 16),
+            ],
             header,
             Text(
               'Muestra este código en el local',
@@ -110,7 +116,8 @@ class _Body extends StatelessWidget {
             _PickupCode(order: order),
             const SizedBox(height: 8),
             Text(pickup, textAlign: TextAlign.center, style: t.titleMedium),
-            const SizedBox(height: 24),
+            _HowToGet(order: order),
+            const SizedBox(height: 16),
             if (canCancel) ...[
               Text(
                 'Puedes cancelar con reembolso hasta $deadlineText.',
@@ -140,6 +147,8 @@ class _Body extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: t.bodySmall?.copyWith(color: WoowfyColors.muted),
               ),
+            const SizedBox(height: 16),
+            _PickupHelp(order: order),
           ],
         );
       case OrderStatus.pendingPayment:
@@ -147,6 +156,8 @@ class _Body extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             header,
+            _VerifyPayment(orderId: order.id),
+            const SizedBox(height: 12),
             if (order.expiresAt != null)
               Countdown(
                 until: order.expiresAt!,
@@ -171,10 +182,21 @@ class _Body extends StatelessWidget {
                 onPressed: () => openCheckout(context, order.checkoutUrl!),
                 child: Text('Completar pago ${formatClp(order.amount)}'),
               ),
-            _VerifyPayment(orderId: order.id),
-            TextButton(
-              onPressed: () => _cancel(context, paid: false),
-              child: const Text('Cancelar reserva'),
+            const SizedBox(height: 16),
+            const Divider(),
+            Wrap(
+              alignment: WrapAlignment.center,
+              children: [
+                TextButton(
+                  onPressed: () => _cancel(context, paid: false),
+                  style: TextButton.styleFrom(foregroundColor: WoowfyColors.muted),
+                  child: const Text('Cancelar reserva'),
+                ),
+                TextButton(
+                  onPressed: () => _writeUs(order),
+                  child: const Text('¿Problemas? Escríbenos'),
+                ),
+              ],
             ),
           ],
         );
@@ -477,11 +499,26 @@ class _VerifyPayment extends StatefulWidget {
 
 class _VerifyPaymentState extends State<_VerifyPayment> {
   bool _busy = false;
+  int _autoChecks = 0;
+  Timer? _timer;
+
+  /// Al volver de Mercado Pago el aviso del pago puede atrasarse: se revisa solo cada 15 s durante 1 minuto.
+  static const _maxAutoChecks = 4;
 
   @override
   void initState() {
     super.initState();
     _verify(silent: true);
+    _timer = Timer.periodic(const Duration(seconds: 15), (t) {
+      if (++_autoChecks >= _maxAutoChecks) t.cancel();
+      if (mounted) _verify(silent: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   Future<void> _verify({bool silent = false}) async {
@@ -506,15 +543,123 @@ class _VerifyPaymentState extends State<_VerifyPayment> {
 
   @override
   Widget build(BuildContext context) {
-    return TextButton.icon(
-      onPressed: _busy ? null : () => _verify(),
-      icon: _busy
-          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-          : const Icon(Icons.refresh, size: 18),
-      label: Text(_busy ? 'Verificando pago…' : 'Ya pagué, verificar'),
+    final t = Theme.of(context).textTheme;
+    final checking = _busy || (_timer?.isActive ?? false);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: WoowfyColors.limeSoft, borderRadius: BorderRadius.circular(16)),
+      child: Column(children: [
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          if (checking) ...[
+            const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+            const SizedBox(width: 10),
+          ],
+          Flexible(
+            child: Text(checking ? 'Confirmando tu pago…' : '¿Ya pagaste?',
+                style: t.titleSmall, textAlign: TextAlign.center),
+          ),
+        ]),
+        const SizedBox(height: 4),
+        Text(
+          checking
+              ? 'Si ya pagaste en Mercado Pago, puede tardar hasta 1 minuto. Lo revisamos solos.'
+              : 'Si pagaste y aún no aparece, revísalo de nuevo o escríbenos.',
+          style: t.bodySmall?.copyWith(color: WoowfyColors.muted),
+          textAlign: TextAlign.center,
+        ),
+        if (!checking)
+          TextButton.icon(
+            onPressed: () => _verify(),
+            icon: const Icon(Icons.refresh, size: 18),
+            label: const Text('Revisar de nuevo'),
+          ),
+      ]),
     );
   }
 }
+
+/// Los primeros minutos después de pagar: el momento "es tuya", con lo pagado y lo ahorrado.
+class _JustPaid extends StatelessWidget {
+  const _JustPaid({required this.order});
+
+  final BagOrder order;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final saved = order.originalPrice == null ? null : order.originalPrice! - order.amount;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(color: WoowfyColors.green, borderRadius: BorderRadius.circular(18)),
+      child: Column(children: [
+        Text('¡Es tuya!', style: t.headlineSmall?.copyWith(color: WoowfyColors.cream)),
+        const SizedBox(height: 2),
+        Text(
+          saved != null && saved > 0
+              ? 'Pagaste ${formatClp(order.amount)} · ahorraste ${formatClp(saved)}'
+              : 'Pagaste ${formatClp(order.amount)}',
+          style: t.titleSmall?.copyWith(color: WoowfyColors.lime),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 2),
+        Text('Muestra este código en el local al retirar.',
+            style: t.bodySmall?.copyWith(color: WoowfyColors.cream), textAlign: TextAlign.center),
+      ]),
+    );
+  }
+}
+
+/// La dirección del local abre el mapa ("Cómo llegar").
+class _HowToGet extends StatelessWidget {
+  const _HowToGet({required this.order});
+
+  final BagOrder order;
+
+  @override
+  Widget build(BuildContext context) {
+    final place = [order.address, order.comuna].where((s) => s.isNotEmpty).join(', ');
+    if (place.isEmpty) return const SizedBox.shrink();
+    return Center(
+      child: TextButton.icon(
+        onPressed: () => launchUrl(Uri.parse(
+            'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent('${order.storeName}, $place, Chile')}')),
+        icon: const Icon(Icons.place_outlined, size: 18),
+        label: Text('$place · Cómo llegar'),
+      ),
+    );
+  }
+}
+
+/// Si algo sale mal en el local: contacto con el código del pedido ya escrito.
+class _PickupHelp extends StatelessWidget {
+  const _PickupHelp({required this.order});
+
+  final BagOrder order;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.support_agent, color: WoowfyColors.green),
+        title: const Text('¿Problemas con tu retiro?'),
+        subtitle: Text('Escríbenos a $supportEmail con tu pedido', style: t.bodySmall?.copyWith(color: WoowfyColors.muted)),
+        trailing: const Icon(Icons.mail_outline),
+        onTap: () => _writeUs(order),
+      ),
+    );
+  }
+}
+
+const supportEmail = 'hola@passva.com';
+
+/// Abre el correo con el pedido ya identificado (asunto y cuerpo).
+Future<void> _writeUs(BagOrder order) => launchUrl(Uri(
+      scheme: 'mailto',
+      path: supportEmail,
+      query: 'subject=${Uri.encodeComponent('Pedido ${order.id} · ${order.storeName}')}'
+          '&body=${Uri.encodeComponent('Hola, tengo un problema con mi pedido ${order.id} (${order.bagTitle}, ${order.storeName}).\n\n')}',
+    ));
 
 class _RefundStatus extends StatelessWidget {
   const _RefundStatus({required this.status, required this.amount});
