@@ -100,7 +100,7 @@
     .hero::before { content: ""; position: absolute; inset: -20% -10% auto auto; width: 720px; height: 720px; background: radial-gradient(circle, var(--orange-soft) 0%, transparent 65%); z-index: -1; }
     .hero::after { content: ""; position: absolute; left: -200px; bottom: -260px; width: 620px; height: 620px; background: radial-gradient(circle, var(--lime-soft) 0%, transparent 65%); z-index: -1; }
     .hero .wrap { display: grid; grid-template-columns: 1.05fr .95fr; gap: 56px; align-items: center; }
-    .hero h1 { font-size: clamp(2.6rem, 6vw, 4.8rem); margin: 18px 0 22px; }
+    .hero h1 { font-size: clamp(2.6rem, 5.2vw, 4.1rem); margin: 18px 0 22px; }
     .hero h1 .hl { position: relative; white-space: nowrap; z-index: 0; }
     .hero h1 .hl::after { content: ""; position: absolute; left: -4px; right: -4px; bottom: .08em; height: .32em; background: var(--lime); border-radius: 6px; z-index: -1; transform: rotate(-1deg); }
     .hero p.lead { font-size: 1.2rem; color: var(--muted); max-width: 520px; }
@@ -135,7 +135,7 @@
     .float { position: absolute; background: var(--white); border-radius: 18px; padding: 14px 16px; box-shadow: var(--shadow); border: 1px solid var(--line); display: flex; align-items: center; gap: 12px; z-index: 2; }
     .float small { display: block; color: var(--muted); font-size: .75rem; }
     .float b { font-size: .95rem; color: var(--green); font-weight: 900; }
-    .float.qr { right: 0; bottom: 70px; }
+    .float.qr { right: -36px; bottom: -34px; }
     .float.split { left: -40px; top: -20px; }
     .float .ico { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; flex: none; background: var(--lime-soft); color: var(--green); }
     .float.split { display: block; min-width: 190px; }
@@ -146,7 +146,11 @@
     .qr-mini { width: 44px; height: 44px; }
 
     /* ---------- Cinta ---------- */
-    main { overflow-x: clip; } /* la cinta inclinada no debe ensanchar la página */
+    main { overflow-x: clip; display: flex; flex-direction: column; }
+    main > * { order: 2; }
+    main > .hero { order: 0; }
+    /* Antes del lanzamiento la acción es inscribirse: el formulario queda justo bajo el hero. */
+    html:not(.launched) main > #waitlist { order: 1; }
 
     /* ---------- Secciones ---------- */
     section { padding: 110px 0; }
@@ -157,7 +161,6 @@
 
     .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; counter-reset: step; }
     .step { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); padding: 32px 28px 30px; position: relative; transition: transform .25s ease, box-shadow .25s ease; }
-    .step:hover { transform: translateY(-6px); box-shadow: var(--shadow); }
     .step::before { counter-increment: step; content: "0" counter(step); position: absolute; top: 24px; right: 26px; font-weight: 900; font-size: 2.6rem; color: var(--line); }
     .step .ico { width: 60px; height: 60px; border-radius: 18px; display: grid; place-items: center; margin-bottom: 26px; }
     .step h3 { font-size: 1.45rem; margin-bottom: 10px; }
@@ -252,7 +255,8 @@
       .hero { padding-top: 40px; }
       .phone-stage { min-height: 520px; }
       .steps { grid-template-columns: 1fr; }
-      .nav-links { display: none; }
+      .nav-links li:not(.keep) { display: none; }
+      .nav-links { gap: 0; margin-left: auto; margin-right: 12px; }
       .waitlist .mascot { display: none; }
     }
     @media (max-width: 560px) {
@@ -271,6 +275,7 @@
       .logo { font-size: 1.5rem; }
       .logo svg { width: 40px; }
     }
+    .waitlist [aria-invalid="true"] { outline: 3px solid var(--coral); outline-offset: 2px; }
   </style>
 </head>
 <body>
@@ -304,7 +309,7 @@
       <a class="logo" href="#" aria-label="Woowfy, inicio"><svg aria-hidden="true"><use href="#mascot"/></svg>woowfy</a>
       <ul class="nav-links">
         <li><a href="#how-it-works">Cómo funciona</a></li>
-        <li><a href="/merchants">Comercios</a></li>
+        <li class="keep"><a href="/merchants">Comercios</a></li>
         <li><a href="#impact">Impacto</a></li>
         <li><a href="#faq">Preguntas</a></li>
       </ul>
@@ -495,7 +500,7 @@
           <div>
             <h2 id="waitlist-title" data-prelaunch>Sé de los primeros en rescatar</h2>
             <h2 data-launch>¿Aún no hay locales en tu comuna?</h2>
-            <p class="lead" data-prelaunch>Te escribimos una sola vez cuando Woowfy abra en tu comuna. Si tienes un local, te contactamos para sumarlo desde el día uno.</p>
+            <p class="lead" data-prelaunch>Te escribimos una sola vez cuando haya bolsas en tu región. Si tienes un local, te contactamos para sumarlo desde el día uno.</p>
             <p class="lead" data-launch>Déjanos tu correo y te avisamos cuando se sume un local cerca de ti. Si tienes un local, te ayudamos a sumarlo.</p>
             <svg class="mascot" aria-hidden="true"><use href="#mascot"/></svg>
           </div>
@@ -551,7 +556,7 @@
             <div class="form-done" id="form-done" hidden>
               <svg aria-hidden="true"><use href="#mascot"/></svg>
               <h3 id="done-title">¡Listo, estás en la lista!</h3>
-              <p id="done-text">Te avisaremos apenas haya novedades en tu comuna.</p>
+              <p id="done-text">Te avisaremos apenas haya bolsas en tu región.</p>
             </div>
           </div>
         </div>
@@ -613,12 +618,12 @@
       statusEl.className = 'form-status';
       const data = Object.fromEntries(new FormData(form));
       data.consent = document.getElementById('consent').checked;
-      if (!String(data.name || '').trim()) return showError('Cuéntanos tu nombre.');
-      if (!form.email.checkValidity()) return showError('Revisa tu correo.');
-      if (data.type === 'comercio' && !String(data.businessName || '').trim()) return showError('Cuéntanos el nombre de tu local.');
-      if (!data.region) return showError('Elige tu región.');
-      if (!String(data.comuna || '').trim()) return showError('Escribe tu comuna.');
-      if (!data.consent) return showError('Marca la casilla para que podamos escribirte.');
+      if (!String(data.name || '').trim()) return showError('Cuéntanos tu nombre.', form.name);
+      if (!form.email.checkValidity()) return showError('Revisa tu correo.', form.email);
+      if (data.type === 'comercio' && !String(data.businessName || '').trim()) return showError('Cuéntanos el nombre de tu local.', form.businessName);
+      if (!data.region) return showError('Elige tu región.', form.region);
+      if (!String(data.comuna || '').trim()) return showError('Escribe tu comuna.', form.comuna);
+      if (!data.consent) return showError('Marca la casilla para que podamos escribirte.', document.getElementById('consent'));
 
       const button = form.querySelector('button[type=submit]');
       button.disabled = true;
@@ -648,10 +653,18 @@
       }
     });
 
-    function showError(msg) {
+    function showError(msg, field) {
       statusEl.textContent = msg;
       statusEl.className = 'form-status error';
+      if (field) {
+        field.setAttribute('aria-invalid', 'true');
+        field.setAttribute('aria-describedby', 'form-status');
+        field.focus();
+      }
     }
+    // Al corregir, el campo deja de marcarse como error.
+    form.addEventListener('input', e => e.target.removeAttribute('aria-invalid'));
+    form.addEventListener('change', e => e.target.removeAttribute('aria-invalid'));
 
     document.getElementById('year').textContent = new Date().getFullYear();
     const nav = document.getElementById('nav');

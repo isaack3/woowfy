@@ -1,7 +1,7 @@
 # Woowfy — Hoja de ruta
 
 Marketplace de bolsas sorpresa contra el desperdicio de comida. Chile primero, luego Latam.
-Marca las casillas a medida que avancemos. Última actualización: 10-10-2026 (ronda 5: comercio).
+Marca las casillas a medida que avancemos. Última actualización: 10-10-2026 (ronda 6: landing).
 
 **En línea:** [woowfy.com](https://woowfy.com) (landing) · [app.woowfy.com](https://app.woowfy.com) (app)
 
@@ -218,6 +218,14 @@ Puntajes (heurísticas de Nielsen): Home 22/40 · flujo cliente 22/40 · comerci
 - [x] Mientras te aprueban: checklist con logo y horario, cuenta bancaria y guía (plazo "normalmente 1 día hábil"); el envío de la solicitud ya no falla en silencio
 - [x] Publicar no se cierra al tocar fuera; "Bolsa publicada · Ver como cliente"
 - [x] Interruptores con nombre para lectores de pantalla; menú ⋮ con Editar, Publicar de nuevo y Cancelar
+
+**Ronda 6 — landing ✅** (desplegada el 10-10)
+- [x] Antes del lanzamiento, la lista de espera queda justo debajo del hero (ya lanzada, vuelve al final)
+- [x] Guía para comercios coherente con el pre-lanzamiento: "Déjanos tus datos → Te contactamos"; ya lanzada, los pasos de la app
+- [x] "Cuando haya bolsas en tu región" (antes "en tu comuna", que contradecía "todo Chile")
+- [x] El código flotante ya no tapa "Quedan 2"; título del hero algo más chico; "Comercios" visible en el menú del celular
+- [x] Errores del formulario: el campo se marca (aria-invalid) y recibe el foco
+- [x] Tarjetas sin efecto de "levantarse"; aviso de privacidad de la cuenta sin duplicar
 
 ### Próximo (por decidir)
 - [ ] Empleados por local, reclamos y moderación de opiniones, invitar amigos (referidos)
