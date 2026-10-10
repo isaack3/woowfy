@@ -27,7 +27,7 @@
   <style>
     :root {
       --green: #063B25; --green-2: #0B5A39; --lime: #9BE52C; --lime-soft: #E6F8CC;
-      --coral: #FF694D; --coral-soft: #FFE0D9; --orange: #FF9B4A; --orange-soft: #FFE7D1;
+      --coral: #FF694D; --coral-soft: #FFE0D9; --coral-ink: #B83A22; --orange: #FF9B4A; --orange-soft: #FFE7D1;
       --cream: #FFF7E3; --ink: #101713; --muted: #4E5A53; --line: #EBDFC3; --white: #FFFFFF;
       --radius: 22px; --shadow: 0 20px 50px -20px rgba(6, 59, 37, .28);
     }
@@ -38,7 +38,7 @@
     a { color: var(--green); }
     .wrap { width: min(1080px, 100% - 32px); margin-inline: auto; }
     h1, h2, h3 { font-weight: 900; line-height: 1.08; letter-spacing: -0.025em; color: var(--green); }
-    .eyebrow { display: inline-block; font-weight: 900; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; color: var(--coral); }
+    .eyebrow { display: inline-block; font-weight: 900; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; color: var(--coral-ink); }
 
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 14px 24px; border-radius: 999px; font: inherit; font-weight: 900; text-decoration: none; cursor: pointer; border: 0; white-space: nowrap; transition: transform .2s ease, background .2s ease; }
     .btn:hover { transform: translateY(-2px); }
@@ -128,7 +128,7 @@
     details { background: var(--white); border: 1px solid var(--line); border-radius: 18px; padding: 0 22px; }
     summary { list-style: none; cursor: pointer; padding: 18px 0; font-weight: 900; color: var(--green); display: flex; justify-content: space-between; gap: 16px; }
     summary::-webkit-details-marker { display: none; }
-    summary::after { content: "+"; font-size: 1.5rem; font-weight: 400; color: var(--coral); line-height: 1; }
+    summary::after { content: "+"; font-size: 1.5rem; font-weight: 400; color: var(--coral-ink); line-height: 1; }
     details[open] summary::after { content: "–"; }
     details p { color: var(--muted); padding-bottom: 18px; }
 
@@ -148,6 +148,7 @@
     @media (max-width: 900px) {
       .hero .wrap, .money, .grid2 { grid-template-columns: 1fr; }
       .hero .mascot { display: none; }
+      .hero::after { width: 200px; height: 200px; right: -120px; top: -130px; }
       .steps { grid-template-columns: 1fr 1fr; }
       .steps.three { grid-template-columns: 1fr; }
       .flow { grid-template-columns: 1fr; text-align: left; }
@@ -208,7 +209,6 @@
     <section class="hero" style="padding-top:64px" aria-labelledby="title">
       <div class="wrap">
         <div>
-          <span class="eyebrow">Guía para comercios</span>
           <h1 id="title">Convierte lo que sobra en ventas</h1>
           <p>Todo lo que necesitas saber para vender tus excedentes del día en Woowfy: cómo publicar, cómo entregar,
              cuánto recibes y cuándo te pagamos. Sin mensualidad ni equipos especiales.</p>
@@ -235,7 +235,6 @@
     <section id="start" aria-labelledby="start-title">
       <div class="wrap">
         <div class="head">
-          <span class="eyebrow">Empezar</span>
           <h2 id="start-title">De cero a tu primera venta</h2>
           <p>Todo se hace desde el navegador del celular o del computador. No hay nada que instalar.</p>
         </div>
@@ -267,7 +266,6 @@
     <section id="numbers" aria-labelledby="numbers-title">
       <div class="wrap">
         <div class="head">
-          <span class="eyebrow">Cuánto recibes</span>
           <h2 id="numbers-title">Sin mensualidad: solo una comisión por bolsa vendida</h2>
           <p>Woowfy cobra el <strong>25% del precio de oferta</strong> de cada bolsa vendida. Eso incluye el cobro en línea,
              la app, la difusión y la atención a clientes. Si no vendes, no pagas nada.</p>
@@ -298,7 +296,6 @@
     <section id="publish" aria-labelledby="publish-title">
       <div class="wrap">
         <div class="head">
-          <span class="eyebrow">Publicar bolsas</span>
           <h2 id="publish-title">Consejos para que tus bolsas vuelen</h2>
         </div>
         <div class="grid2">
@@ -325,7 +322,6 @@
     <section id="pickup" aria-labelledby="pickup-title">
       <div class="wrap">
         <div class="head">
-          <span class="eyebrow">Entregar</span>
           <h2 id="pickup-title">Validar un retiro toma 5 segundos</h2>
           <p>Cada compra tiene un código único de 6 caracteres que <strong>solo ve el cliente</strong>. Así nadie puede retirar una bolsa ajena.</p>
         </div>
@@ -336,11 +332,11 @@
           </article>
           <article class="step">
             <h3>Lo escaneas</h3>
-            <p>En tu panel, <em>Validar retiro → Escanear QR</em> con la cámara. Si no hay cámara, escribes el código.</p>
+            <p>En tu panel toca <em>Validar retiro</em>: la cámara queda abierta y validas un cliente tras otro. Si no hay cámara, escribes el código.</p>
           </article>
           <article class="step">
             <h3>Entregas la bolsa</h3>
-            <p>Si el código es válido verás la bolsa y el monto. El pedido queda como retirado y suma a tus ventas.</p>
+            <p>Si el código es válido verás en verde la bolsa y el monto; si ya se retiró o no corresponde, en rojo "No entregues". El pedido queda como retirado y suma a tus ventas.</p>
           </article>
         </div>
       </div>
@@ -349,7 +345,6 @@
     <section id="rules" aria-labelledby="rules-title">
       <div class="wrap">
         <div class="head">
-          <span class="eyebrow">Cancelaciones</span>
           <h2 id="rules-title">Qué pasa si algo cambia</h2>
         </div>
         <table>
@@ -368,7 +363,6 @@
     <section id="payouts" aria-labelledby="payouts-title">
       <div class="wrap">
         <div class="head">
-          <span class="eyebrow">Pagos</span>
           <h2 id="payouts-title">Te transferimos tus ventas cada semana</h2>
           <p>Cada semana sumamos tus ventas cerradas (retiradas y no retiradas por el cliente), descontamos la comisión y te
              transferimos el total a la cuenta que registraste. En <em>Ventas y pagos</em> ves:</p>
@@ -388,7 +382,7 @@
             <div class="dot"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 10v4M18 10v4"/></svg></div>
             <div><b>3. Te transferimos</b><small>Cada semana, ya descontada la comisión</small></div>
           </div>
-          <p class="lock">🔒 Tu cuenta es privada: solo la ve el equipo de Woowfy para transferirte.</p>
+          <p class="lock"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> Tu cuenta es privada: solo la ve el equipo de Woowfy para transferirte.</p>
         </div>
         <div class="grid2">
           <div class="card">
@@ -410,7 +404,6 @@
     <section id="faq" aria-labelledby="faq-title">
       <div class="wrap">
         <div class="head">
-          <span class="eyebrow">Preguntas frecuentes</span>
           <h2 id="faq-title">Lo que más nos preguntan los locales</h2>
         </div>
         <div class="faq">

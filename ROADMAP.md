@@ -1,7 +1,7 @@
 # Woowfy — Hoja de ruta
 
 Marketplace de bolsas sorpresa contra el desperdicio de comida. Chile primero, luego Latam.
-Marca las casillas a medida que avancemos. Última actualización: 09-10-2026 (crítica de diseño, ronda 2 tanda B).
+Marca las casillas a medida que avancemos. Última actualización: 09-10-2026 (crítica de diseño, ronda 2 completa).
 
 **En línea:** [woowfy.com](https://woowfy.com) (landing) · [app.woowfy.com](https://app.woowfy.com) (app)
 
@@ -179,8 +179,12 @@ Puntajes (heurísticas de Nielsen): Home 22/40 · flujo cliente 22/40 · comerci
 - [x] Modo mostrador: cámara abierta, pantalla verde "Entrega: {bolsa} · Pagado $X" que sigue sola en 3 s, pantalla coral "No entregues" (ya retirado, código no válido, horario terminado) que espera un toque, vibración y "Por retirar: N"
 - [x] Errores del servidor sin el sufijo técnico ("[404]") y "ya fue retirado" bien traducido
 
-**Ronda 2 — por hacer**
-- [ ] Landing: hero sin comercios inventados, menos recursos de plantilla, contraste del coral
+**Ronda 2 — tanda C ✅** (landing; desplegada el 09-10). Detector: de 34 a 24 hallazgos (los que quedan son decisiones de marca: Lato, crema, íconos en recuadro)
+- [x] Aviso de lanzamiento tranquilo ("Abrimos pronto en todo Chile"), sin rayas ni punto que parpadea
+- [x] Hero: maqueta con "Tu panadería de barrio" y "Ejemplo" (sin locales inventados), tarjeta con el reparto real (pagas / el local recibe / 25%) y "sin descargar nada"
+- [x] Sin etiquetas sobre los títulos (home y /merchants), sin cinta animada, íconos en vez de emojis, "1/3" como frase con su fuente, secciones que ya no parten invisibles
+- [x] Coral oscuro (#B83A22) para texto y etiquetas (contraste AA); círculo lima de /merchants ya no tapa el título en celular
+- [x] Guía para comercios al día con el modo mostrador
 
 ### Próximo (por decidir)
 - [ ] Empleados por local, reclamos y moderación de opiniones, invitar amigos (referidos)
