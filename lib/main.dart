@@ -20,14 +20,16 @@ Future<void> main() async {
   usePathUrlStrategy();
   await initializeDateFormatting('es_CL');
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  // Correos de Firebase Auth (p. ej. recuperar contraseña) en español.
-  await FirebaseAuth.instance.setLanguageCode('es');
+  // Los emuladores se conectan antes de usar Auth: si no, la sesión guardada se valida contra producción y se pierde
+  // al recargar.
   if (useEmulators) {
     await FirebaseAuth.instance.useAuthEmulator('localhost', 9099);
     FirebaseFirestore.instance.useFirestoreEmulator('localhost', 8080);
     functions.useFunctionsEmulator('localhost', 5001);
     await FirebaseStorage.instance.useStorageEmulator('localhost', 9199);
   }
+  // Correos de Firebase Auth (p. ej. recuperar contraseña) en español.
+  await FirebaseAuth.instance.setLanguageCode('es');
   // Espera a que Firebase restaure la sesión guardada: si no, al abrir directo una ruta protegida
   // (p. ej. /merchant) el router vería "sin sesión" y mandaría al login.
   await FirebaseAuth.instance.authStateChanges().first;

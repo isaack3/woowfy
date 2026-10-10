@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/checkout.dart';
 import '../../core/errors.dart';
@@ -28,8 +31,16 @@ class OrderPage extends StatelessWidget {
       body: Reloadable(builder: (context) => StreamBuilder<BagOrder?>(
         stream: Repository.instance.watchOrder(orderId),
         builder: (context, snap) {
-          if (snap.hasError) return ErrorRetry(title: 'No pudimos cargar el pedido', error: snap.error);
-          if (snap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+          if (snap.hasError) {
+            return _SavedOr(
+              orderId: orderId,
+              offline: true,
+              orElse: ErrorRetry(title: 'No pudimos cargar el pedido', error: snap.error),
+            );
+          }
+          if (snap.connectionState == ConnectionState.waiting) {
+            return _SavedOr(orderId: orderId, orElse: const Center(child: CircularProgressIndicator()));
+          }
           final order = snap.data;
           if (order == null) {
             return Center(
@@ -313,6 +324,7 @@ class _PickupCode extends StatelessWidget {
         if (code == null) {
           return const SizedBox(height: 252, child: Center(child: CircularProgressIndicator()));
         }
+        _SavedReceipt.save(order, code);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -334,6 +346,118 @@ class _PickupCode extends StatelessWidget {
               style: t.displaySmall?.copyWith(letterSpacing: 8, fontWeight: FontWeight.w700),
             ),
           ],
+        );
+      },
+    );
+  }
+}
+
+/// Lo mínimo para retirar sin internet: se guarda en el teléfono cada vez que se ve el código de un pedido pagado.
+class _SavedReceipt {
+  const _SavedReceipt({required this.storeName, required this.bagTitle, required this.pickup, required this.code});
+
+  final String storeName;
+  final String bagTitle;
+  final String pickup;
+  final String code;
+
+  static String _key(String orderId) => 'receipt.$orderId';
+
+  static Future<void> save(BagOrder order, String code) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _key(order.id),
+        jsonEncode({
+          'storeName': order.storeName,
+          'bagTitle': order.bagTitle,
+          'pickup': formatPickup(order.pickupStart, order.pickupEnd, withDate: true),
+          'code': code,
+        }),
+      );
+    } catch (_) {}
+  }
+
+  static Future<_SavedReceipt?> load(String orderId) async {
+    try {
+      final raw = (await SharedPreferences.getInstance()).getString(_key(orderId));
+      if (raw == null) return null;
+      final d = jsonDecode(raw) as Map<String, dynamic>;
+      return _SavedReceipt(
+        storeName: d['storeName'] as String,
+        bagTitle: d['bagTitle'] as String,
+        pickup: d['pickup'] as String,
+        code: d['code'] as String,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+/// Mientras el pedido carga (o si no hay señal), muestra el código guardado; si no hay nada guardado, [orElse].
+class _SavedOr extends StatelessWidget {
+  const _SavedOr({required this.orderId, required this.orElse, this.offline = false});
+
+  final String orderId;
+  final Widget orElse;
+  final bool offline;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return FutureBuilder<_SavedReceipt?>(
+      future: _SavedReceipt.load(orderId),
+      builder: (context, snap) {
+        final r = snap.data;
+        if (r == null) return orElse;
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: ListView(padding: const EdgeInsets.all(24), children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(color: WoowfyColors.orangeSoft, borderRadius: BorderRadius.circular(12)),
+                child: Row(children: [
+                  Icon(offline ? Icons.wifi_off : Icons.sync, size: 18, color: const Color(0xFF7A3510)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      offline ? 'Sin conexión: este es tu código guardado' : 'Actualizando… este es tu código guardado',
+                      style: t.bodySmall?.copyWith(color: const Color(0xFF7A3510), fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 16),
+              Text(r.storeName, style: t.headlineSmall),
+              Text(r.bagTitle, style: t.bodyMedium?.copyWith(color: WoowfyColors.muted)),
+              const SizedBox(height: 16),
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+                  child: QrImageView(data: r.code, size: 220),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(r.code,
+                  textAlign: TextAlign.center,
+                  style: t.displaySmall?.copyWith(letterSpacing: 8, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Text('Retiro ${r.pickup}', textAlign: TextAlign.center, style: t.titleMedium),
+              if (offline) ...[
+                const SizedBox(height: 16),
+                Center(
+                  child: TextButton.icon(
+                    onPressed: Reloadable.retryOf(context),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Reintentar'),
+                  ),
+                ),
+              ],
+            ]),
+          ),
         );
       },
     );

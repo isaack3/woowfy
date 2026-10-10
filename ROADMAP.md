@@ -1,7 +1,7 @@
 # Woowfy — Hoja de ruta
 
 Marketplace de bolsas sorpresa contra el desperdicio de comida. Chile primero, luego Latam.
-Marca las casillas a medida que avancemos. Última actualización: 10-10-2026 (ronda 3: confianza con el dinero).
+Marca las casillas a medida que avancemos. Última actualización: 10-10-2026 (ronda 4: primera visita).
 
 **En línea:** [woowfy.com](https://woowfy.com) (landing) · [app.woowfy.com](https://app.woowfy.com) (app)
 
@@ -199,6 +199,16 @@ Puntajes (heurísticas de Nielsen): Home 22/40 · flujo cliente 22/40 · comerci
 - [x] Mostrador: "Entrega · 1 × {bolsa}" y "El cliente ya pagó $X en línea"; tono corto (también en iPhone); reintento inmediato tras un error de red
 - [x] Admin: liquidar también locales suspendidos
 - [x] RUT de la cuenta bancaria validado (dígito verificador) y guardado con formato
+
+**Ronda 4 — primera visita ✅** (probada en emuladores y desplegada el 10-10)
+- [x] Home sin bolsas: selector de región siempre visible, "Aún sin bolsas · {región}", "Sé de los primeros en {región}" y "Avísame" que abre la lista de espera con la región elegida (`woowfy.com/?region=`)
+- [x] La lista se revisa cada minuto: las bolsas que cerraron desaparecen solas; título "Bolsas disponibles"; "Cierra en N min" en la tarjeta
+- [x] Comprobante: el código, el local y el horario quedan guardados en el teléfono y se muestran si no hay conexión
+- [x] Enlace de una bolsa que ya no está: "Esta bolsa ya se rescató o venció" con "Ver bolsas disponibles"
+- [x] "Cerca de ti" en el selector; la región ya no se borra si falla el permiso de ubicación
+- [x] Bolsa sin foto con ilustración "Bolsa sorpresa" (no un ícono de imagen rota); tarjeta que crece con letra grande
+- [x] Login con contexto también para Mis pedidos, un pedido y el panel; la flecha vuelve a la bolsa
+- [x] Controles de la Home de al menos 44 px
 
 ### Próximo (por decidir)
 - [ ] Empleados por local, reclamos y moderación de opiniones, invitar amigos (referidos)

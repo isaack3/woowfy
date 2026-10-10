@@ -66,6 +66,15 @@ class BagCard extends StatelessWidget {
                       Text(distance!, style: t.bodySmall?.copyWith(color: WoowfyColors.green, fontWeight: FontWeight.w700)),
                     ],
                   ]),
+                  if (_closesSoon(bag) case final mins?) ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: const ShapeDecoration(color: WoowfyColors.orangeSoft, shape: StadiumBorder()),
+                      child: Text('Cierra en $mins min',
+                          style: t.labelSmall?.copyWith(color: const Color(0xFF7A3510), fontWeight: FontWeight.w800)),
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -89,4 +98,13 @@ class BagCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Minutos que faltan para que cierre el retiro, si ya empezó y queda menos de 1 h (para "Cierra en 25 min").
+int? _closesSoon(Bag bag) {
+  if (bag.soldOut) return null;
+  final now = DateTime.now();
+  if (now.isBefore(bag.pickupStart)) return null;
+  final left = bag.pickupEnd.difference(now).inMinutes;
+  return left >= 0 && left < 60 ? left + 1 : null;
 }

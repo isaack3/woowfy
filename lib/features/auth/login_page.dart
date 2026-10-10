@@ -45,6 +45,22 @@ class _LoginPageState extends State<LoginPage> {
   /// Si viene de "Reservar" en una bolsa: el local, para decir para qué se pide ingresar.
   String? _reserveStore;
 
+  /// Para qué se pide ingresar, según de dónde viene la persona.
+  String? get _purpose {
+    if (_reserveStore != null) return 'Para reservar tu bolsa de $_reserveStore. Después vuelves a la bolsa.';
+    final path = Uri.tryParse(widget.redirectTo)?.path ?? '';
+    if (path == '/orders') return 'Para ver tus pedidos y sus códigos de retiro.';
+    if (path.startsWith('/order/')) return 'Para ver tu pedido y su código de retiro.';
+    if (path.startsWith('/merchant')) return 'Para entrar al panel de tu local.';
+    return null;
+  }
+
+  /// La flecha atrás vuelve a la bolsa si se venía de una (las demás rutas piden sesión: van al inicio).
+  String get _backTo {
+    final target = Uri.tryParse(widget.redirectTo);
+    return target != null && target.path.startsWith('/bag/') ? target.path : '/';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -161,7 +177,7 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     return Scaffold(
-      appBar: AppBar(leading: BackButton(onPressed: () => context.go('/'))),
+      appBar: AppBar(leading: BackButton(onPressed: () => context.go(_backTo))),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
@@ -175,10 +191,9 @@ class _LoginPageState extends State<LoginPage> {
                   const Center(child: WoowfyLogo(size: 40)),
                   const SizedBox(height: 24),
                   Text(_register ? 'Crea tu cuenta' : 'Ingresa a Woowfy', style: t.headlineSmall),
-                  if (_reserveStore != null) ...[
+                  if (_purpose != null) ...[
                     const SizedBox(height: 4),
-                    Text('Para reservar tu bolsa de $_reserveStore. Después vuelves a la bolsa.',
-                        style: t.bodyMedium?.copyWith(color: WoowfyColors.muted)),
+                    Text(_purpose!, style: t.bodyMedium?.copyWith(color: WoowfyColors.muted)),
                   ],
                   const SizedBox(height: 24),
                   if (InAppBrowser.appName != null)

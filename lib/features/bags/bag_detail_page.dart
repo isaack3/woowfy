@@ -47,13 +47,11 @@ class BagDetailPage extends StatelessWidget {
                 const SizedBox(width: 4),
               ],
             ),
-            body: snap.hasError
-                ? const Center(child: Text('Esta bolsa ya no está disponible.'))
+            body: snap.hasError || (snap.connectionState != ConnectionState.waiting && bag == null)
+                ? const _GoneBag()
                 : snap.connectionState == ConnectionState.waiting
                 ? const Center(child: CircularProgressIndicator())
-                : bag == null
-                ? const Center(child: Text('Bolsa no encontrada.'))
-                : _Detail(bag: bag, resume: resume && FirebaseAuth.instance.currentUser != null),
+                : _Detail(bag: bag!, resume: resume && FirebaseAuth.instance.currentUser != null),
           );
         },
       ),
@@ -248,6 +246,34 @@ class _Detail extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// La bolsa ya no existe (se rescató, venció o el enlace es antiguo).
+class _GoneBag extends StatelessWidget {
+  const _GoneBag();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.shopping_bag_outlined, size: 48, color: WoowfyColors.green),
+            const SizedBox(height: 12),
+            Text('Esta bolsa ya se rescató o venció', style: t.titleLarge, textAlign: TextAlign.center),
+            const SizedBox(height: 6),
+            Text('Los locales publican bolsas nuevas todos los días.',
+                style: t.bodyMedium?.copyWith(color: WoowfyColors.muted), textAlign: TextAlign.center),
+            const SizedBox(height: 20),
+            FilledButton(onPressed: () => context.go('/'), child: const Text('Ver bolsas disponibles')),
+          ]),
         ),
       ),
     );

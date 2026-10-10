@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
 
-/// Foto de la bolsa; si no tiene (o falla la carga), muestra un ícono de "sin imagen".
+/// Foto de la bolsa; si no tiene (o falla la carga), una ilustración de "bolsa sorpresa" (no un ícono de error).
 class BagImage extends StatelessWidget {
   const BagImage({super.key, required this.url, this.iconSize = 40});
 
@@ -14,7 +14,17 @@ class BagImage extends StatelessWidget {
     final placeholder = Container(
       color: WoowfyColors.limeSoft,
       alignment: Alignment.center,
-      child: Icon(Icons.image_not_supported_outlined, size: iconSize, color: WoowfyColors.green.withValues(alpha: .45)),
+      child: LayoutBuilder(
+        builder: (context, box) => Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.shopping_bag_outlined, size: iconSize, color: WoowfyColors.green),
+          // En miniaturas (p. ej. Mis pedidos) solo el ícono.
+          if (box.maxWidth > 120) ...[
+            const SizedBox(height: 4),
+            Text('Bolsa sorpresa',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(color: WoowfyColors.green, fontWeight: FontWeight.w800)),
+          ],
+        ]),
+      ),
     );
     if (url == null || url!.isEmpty) return placeholder;
     return Image.network(

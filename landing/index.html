@@ -594,7 +594,13 @@
     }
     form.addEventListener('change', e => { if (e.target.name === 'type') setType(e.target.value); });
     // Desde la guía para comercios (/?type=merchant#waitlist) el formulario abre como "Tengo un local".
-    if (new URLSearchParams(location.search).get('type') === 'merchant') setType('comercio');
+    const params = new URLSearchParams(location.search);
+    if (params.get('type') === 'merchant') setType('comercio');
+    const fromRegion = params.get('region');
+    if (fromRegion) {
+      const opt = [...document.querySelectorAll('#region option')].find(o => o.value === fromRegion);
+      if (opt) opt.selected = true;
+    }
 
     // Los botones "Avísame" / "Tengo un local" preseleccionan el tipo y llevan el foco al correo.
     document.querySelectorAll('a[data-type]').forEach(a => a.addEventListener('click', () => {

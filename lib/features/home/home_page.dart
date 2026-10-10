@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
@@ -33,7 +35,9 @@ class HomePage extends StatefulWidget {
 /// Clave donde se recuerda la región elegida (en el navegador o el teléfono).
 const _regionKey = 'home.region';
 
-const _waitlistUrl = 'https://woowfy.com/#waitlist';
+/// Lista de espera de woowfy.com, con la región ya elegida si la hay.
+String _waitlistUrl(String? region) =>
+    region == null ? 'https://woowfy.com/#waitlist' : 'https://woowfy.com/?region=${Uri.encodeComponent(region)}#waitlist';
 const _merchantsGuideUrl = 'https://woowfy.com/merchants';
 
 class _HomePageState extends State<HomePage> {
@@ -52,10 +56,21 @@ class _HomePageState extends State<HomePage> {
   LatLng? _me;
   bool _locating = false;
 
+  Timer? _clock;
+
   @override
   void initState() {
     super.initState();
     _loadRegion();
+    _clock = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _clock?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadRegion() async {
@@ -140,6 +155,7 @@ class _HomePageState extends State<HomePage> {
     );
     if (picked == null) return;
     if (picked.nearMe) {
+      if (!await _locate()) return;
       await _setRegion(null);
       await _setSort(_Sort.nearest);
     } else {
@@ -194,7 +210,9 @@ class _HomePageState extends State<HomePage> {
           stream: _bags,
           builder: (context, snap) {
             final favorites = favSnap.data ?? const <String>{};
-            final all = snap.data;
+            // La consulta fija "ahora" al suscribirse: aquí se descartan las que cerraron mientras la página seguía abierta.
+            final now = DateTime.now();
+            final all = snap.data?.where((b) => b.pickupEnd.isAfter(now)).toList();
             final distances = all == null
                 ? const <String, double>{}
                 : _distances(all);
@@ -206,7 +224,7 @@ class _HomePageState extends State<HomePage> {
             final subtitle = available == null
                 ? (_region ?? 'Todo Chile')
                 : available == 0
-                    ? 'Pronto en tu zona · $place'
+                    ? 'Aún sin bolsas · $place'
                     : '$available ${available == 1 ? 'bolsa disponible' : 'bolsas disponibles'} · $place';
             // Solo se ofrecen las categorías que tienen bolsas hoy en la zona (más la elegida, para poder quitarla).
             final categories =
@@ -223,14 +241,17 @@ class _HomePageState extends State<HomePage> {
               slivers: [
                 SliverToBoxAdapter(
                   child: GreenHeader(
-                    title: 'Bolsas de hoy',
+                    title: 'Bolsas disponibles',
                     subtitle: subtitle,
                   ),
                 ),
-                if (all != null && all.isNotEmpty)
+                if (all != null)
                   SliverToBoxAdapter(
                     child: _Filters(
+                      // Con 0 bolsas solo queda "dónde": orden y mapa no sirven todavía.
+                      onlyRegion: all.isEmpty,
                       region: _region,
+                      nearMe: _region == null && _sort == _Sort.nearest,
                       categories: categories,
                       category: _category,
                       pickupNow: _pickupNow,
@@ -263,8 +284,7 @@ class _HomePageState extends State<HomePage> {
                     child: Center(child: CircularProgressIndicator()),
                   )
                 else if (inRegion!.isEmpty)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
+                  SliverToBoxAdapter(
                     child: _EmptyHome(
                       region: _region,
                       onAllChile: all!.isEmpty ? null : () => _setRegion(null),
@@ -313,9 +333,9 @@ class _HomePageState extends State<HomePage> {
                       maxCrossAxisExtent: 1100,
                       child: SliverGrid.builder(
                         gridDelegate:
-                            const SliverGridDelegateWithMaxCrossAxisExtent(
+                            SliverGridDelegateWithMaxCrossAxisExtent(
                               maxCrossAxisExtent: 360,
-                              mainAxisExtent: 284,
+                              mainAxisExtent: 284 + _extraCardHeight(context),
                               crossAxisSpacing: 16,
                               mainAxisSpacing: 16,
                             ),
@@ -339,9 +359,15 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
+/// Alto extra de la tarjeta cuando la persona usa letra más grande en el navegador o el teléfono.
+double _extraCardHeight(BuildContext context) =>
+    ((MediaQuery.textScalerOf(context).scale(100) / 100 - 1).clamp(0.0, 2.0)) * 90;
+
 /// Dos filas: arriba dónde, cómo se ordena y cómo se ve (lista o mapa); abajo los filtros.
 class _Filters extends StatelessWidget {
   const _Filters({
+    this.onlyRegion = false,
+    this.nearMe = false,
     required this.region,
     required this.categories,
     required this.category,
@@ -360,6 +386,10 @@ class _Filters extends StatelessWidget {
     required this.onMap,
   });
 
+  final bool onlyRegion;
+
+  /// "Cerca de ti": todo Chile ordenado por cercanía.
+  final bool nearMe;
   final String? region;
   final List<String> categories;
   final String? category;
@@ -402,7 +432,8 @@ class _Filters extends StatelessWidget {
 
     // Botón tipo "pastilla" con valor visible y flecha (abre una lista).
     Widget picker(IconData icon, String label, {bool active = false}) => Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          constraints: const BoxConstraints(minHeight: 44),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: ShapeDecoration(
             color: active ? WoowfyColors.lime : Colors.white,
             shape: const StadiumBorder(side: BorderSide(color: WoowfyColors.line)),
@@ -422,7 +453,8 @@ class _Filters extends StatelessWidget {
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1100),
-        child: Padding(
+        child: Container(
+          width: double.infinity,
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -434,15 +466,19 @@ class _Filters extends StatelessWidget {
                 children: [
                   Semantics(
                     button: true,
-                    label: 'Zona: ${region ?? 'Todo Chile'}. Cambiar',
+                    label: 'Zona: ${nearMe ? 'Cerca de ti' : region ?? 'Todo Chile'}. Cambiar',
                     excludeSemantics: true,
                     child: InkWell(
                       customBorder: const StadiumBorder(),
                       onTap: onRegion,
-                      child: picker(Icons.place_outlined, region ?? 'Todo Chile', active: region != null),
+                      child: picker(
+                        nearMe ? Icons.my_location : Icons.place_outlined,
+                        nearMe ? 'Cerca de ti' : region ?? 'Todo Chile',
+                        active: region != null || nearMe,
+                      ),
                     ),
                   ),
-                  PopupMenuButton<_Sort>(
+                  if (!onlyRegion) PopupMenuButton<_Sort>(
                     tooltip: 'Ordenar',
                     initialValue: sort,
                     onSelected: onSort,
@@ -452,15 +488,14 @@ class _Filters extends StatelessWidget {
                     ],
                     child: picker(Icons.sort, sort.label),
                   ),
-                  if (locating)
+                  if (locating && !onlyRegion)
                     const SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
-                  SegmentedButton<bool>(
+                  if (!onlyRegion) SegmentedButton<bool>(
                     showSelectedIcon: false,
-                    style: const ButtonStyle(visualDensity: VisualDensity.compact),
                     segments: const [
                       ButtonSegment(value: false, label: Text('Lista'), icon: Icon(Icons.view_agenda_outlined, size: 16)),
                       ButtonSegment(value: true, label: Text('Mapa'), icon: Icon(Icons.map_outlined, size: 16)),
@@ -595,13 +630,13 @@ class _EmptyHome extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                region == null ? 'Aún no hay bolsas publicadas' : 'Aún no hay bolsas en $region',
+                region == null ? 'Aún no hay bolsas publicadas' : 'Sé de los primeros en $region',
                 style: t.titleLarge,
               ),
               const SizedBox(height: 4),
@@ -625,13 +660,13 @@ class _EmptyHome extends StatelessWidget {
                 FilledButton(onPressed: onAllChile, child: const Text('Ver bolsas de todo Chile')),
                 const SizedBox(height: 8),
                 OutlinedButton(
-                  onPressed: () => launchUrl(Uri.parse(_waitlistUrl)),
-                  child: const Text('Avísame cuando haya bolsas aquí'),
+                  onPressed: () => launchUrl(Uri.parse(_waitlistUrl(region))),
+                  child: Text(region == null ? 'Avísame cuando haya bolsas' : 'Avísame cuando haya bolsas en $region'),
                 ),
               ] else
                 FilledButton(
-                  onPressed: () => launchUrl(Uri.parse(_waitlistUrl)),
-                  child: const Text('Avísame cuando haya bolsas'),
+                  onPressed: () => launchUrl(Uri.parse(_waitlistUrl(region))),
+                  child: Text(region == null ? 'Avísame cuando haya bolsas' : 'Avísame cuando haya bolsas en $region'),
                 ),
               const SizedBox(height: 12),
               Wrap(
