@@ -279,7 +279,8 @@ class Repository {
       .snapshots()
       .map((s) => s.docs.map(BagOrder.fromDoc).toList());
 
-  Future<void> publishBag({
+  /// Publica la bolsa y devuelve su id (para "Ver como cliente").
+  Future<String> publishBag({
     required Store store,
     required String title,
     required String description,
@@ -289,8 +290,8 @@ class Repository {
     required DateTime pickupStart,
     required DateTime pickupEnd,
     String? imageUrl,
-  }) {
-    return _bags.add({
+  }) async {
+    final ref = await _bags.add({
       'storeId': store.id,
       'storeName': store.name,
       'comuna': store.comuna,
@@ -311,6 +312,24 @@ class Repository {
       'imageUrl': ?imageUrl,
       'createdAt': FieldValue.serverTimestamp(),
     });
+    return ref.id;
+  }
+
+  /// Edita una bolsa publicada. [addUnits] suma al stock (con incremento atómico: no pisa compras en curso).
+  Future<void> updateBag(String bagId, Map<String, Object?> data, {int addUnits = 0}) => _bags.doc(bagId).update({
+        ...data,
+        if (addUnits > 0) 'quantityAvailable': FieldValue.increment(addUnits),
+      });
+
+  /// true si alguien ya reservó o compró esta bolsa (entonces su horario no se cambia: ya está en sus comprobantes).
+  Future<bool> bagHasBuyers(String storeId, String bagId) async {
+    final s = await _orders
+        .where('storeId', isEqualTo: storeId)
+        .where('bagId', isEqualTo: bagId)
+        .where('status', whereIn: ['pending_payment', 'paid', 'picked_up', 'no_show'])
+        .limit(1)
+        .get();
+    return s.docs.isNotEmpty;
   }
 
   /// Sube la foto de una bolsa a Storage (uploads/{uid}/bags/...) y devuelve su URL pública.
@@ -340,6 +359,8 @@ class Repository {
       .where('storeId', isEqualTo: storeId)
       .snapshots()
       .map((s) => s.docs.map(BagTemplate.fromDoc).toList());
+
+  Future<void> updateTemplate(String id, Map<String, Object?> data) => _templates.doc(id).update(data);
 
   Future<void> saveTemplate({
     required String storeId,

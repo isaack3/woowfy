@@ -1,4 +1,3 @@
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -12,6 +11,7 @@ import '../../data/chile.dart';
 import '../../data/models.dart';
 import '../../data/repository.dart';
 import '../bags/bag_image.dart';
+import 'merchant_sales_page.dart' show showBankAccountDialog;
 import 'publish_bag_dialog.dart';
 import 'counter.dart';
 import 'store_profile_dialog.dart';
@@ -39,6 +39,8 @@ class MerchantPage extends StatelessWidget {
           final Widget child;
           if (store == null) {
             child = _StoreRequestForm(uid: uid);
+          } else if (store.status == StoreStatus.pending) {
+            child = _PendingChecklist(store: store);
           } else if (!store.approved) {
             child = _StatusMessage(store: store);
           } else {
@@ -53,7 +55,82 @@ class MerchantPage extends StatelessWidget {
   }
 }
 
-/// Solicitud pendiente, rechazada o local suspendido.
+/// Solicitud en revisión: lo que el comercio ya puede ir dejando listo (las reglas lo permiten antes de aprobar).
+class _PendingChecklist extends StatelessWidget {
+  const _PendingChecklist({required this.store});
+
+  final Store store;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    Widget item({required bool done, required String title, String? subtitle, String? action, VoidCallback? onTap}) => Card(
+          child: ListTile(
+            leading: Icon(done ? Icons.check_circle : Icons.radio_button_unchecked,
+                color: done ? WoowfyColors.green : WoowfyColors.muted),
+            title: Text(title),
+            subtitle: subtitle == null ? null : Text(subtitle),
+            trailing: action == null ? null : TextButton(onPressed: onTap, child: Text(action)),
+          ),
+        );
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        const Icon(Icons.hourglass_top, size: 40, color: WoowfyColors.green),
+        const SizedBox(height: 12),
+        Text('Tu solicitud está en revisión', style: t.headlineSmall, textAlign: TextAlign.center),
+        const SizedBox(height: 6),
+        Text(
+          'Normalmente la revisamos en 1 día hábil y te contactamos para validar tu local. Mientras, deja todo listo:',
+          style: t.bodyMedium?.copyWith(color: WoowfyColors.muted),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 16),
+        item(done: true, title: 'Solicitud enviada'),
+        item(
+          done: store.logoUrl != null && store.hours.isNotEmpty,
+          title: 'Sube tu logo y horario',
+          subtitle: 'Así te verán los clientes',
+          action: 'Completar',
+          onTap: () => showDialog<void>(context: context, builder: (_) => StoreProfileDialog(store: store)),
+        ),
+        StreamBuilder<BankAccount?>(
+          stream: Repository.instance.watchBankAccount(store.id),
+          builder: (context, snap) => item(
+            done: snap.data != null,
+            title: 'Agrega tu cuenta bancaria',
+            subtitle: 'Para transferirte tus ventas',
+            action: snap.data == null ? 'Agregar' : 'Editar',
+            onTap: () => showBankAccountDialog(context, store.id),
+          ),
+        ),
+        item(
+          done: false,
+          title: 'Lee la guía para comercios',
+          subtitle: 'Precios, entregas y pagos',
+          action: 'Abrir',
+          onTap: () => launchUrl(Uri.parse('https://woowfy.com/merchants')),
+        ),
+        // Atajo para quien es admin y dueño a la vez: la aprobación se hace en Admin → Solicitudes.
+        StreamBuilder<String?>(
+          stream: Repository.instance.watchRole(store.ownerUid),
+          builder: (context, snap) => snap.data != 'admin'
+              ? const SizedBox.shrink()
+              : Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: FilledButton.icon(
+                    onPressed: () => context.go('/admin'),
+                    icon: const Icon(Icons.admin_panel_settings_outlined),
+                    label: const Text('Eres admin: revisar solicitudes'),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Solicitud rechazada o local suspendido.
 class _StatusMessage extends StatelessWidget {
   const _StatusMessage({required this.store});
 
@@ -155,6 +232,12 @@ class _StoreRequestFormState extends State<_StoreRequestForm> {
         address: _address.text.trim(),
         category: _category,
       );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(friendlyError(e, fallback: 'No pudimos enviar la solicitud. Intenta de nuevo.'))),
+        );
+      }
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -233,74 +316,70 @@ class _Dashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => showDialog<void>(
-          context: context,
-          builder: (_) => PublishBagDialog(store: store),
-        ),
-        icon: const Icon(Icons.add),
-        label: const Text('Publicar bolsa'),
-      ),
-      body: Reloadable(builder: (context) => StreamBuilder<List<Bag>>(
-        stream: Repository.instance.watchStoreBags(store.id),
-        builder: (context, snap) {
-          if (snap.hasError) return ErrorRetry(title: 'No pudimos cargar tus bolsas', error: snap.error);
-          if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-          final bags = snap.data!;
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-            children: [
-              _ProfileCard(store: store),
-              const SizedBox(height: 16),
-              _ToPickUp(storeId: store.id),
-              const SizedBox(height: 12),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.payments_outlined, color: WoowfyColors.green),
-                  title: const Text('Ventas y pagos'),
-                  subtitle: const Text('Lo vendido, lo que Woowfy te pagó y opiniones'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.go('/merchant/sales'),
-                ),
-              ),
-              const _GuideCard(),
-              const SizedBox(height: 24),
-              _Templates(storeId: store.id),
-              const SizedBox(height: 24),
-              Text('Bolsas publicadas', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              if (bags.isEmpty) const Text('Aún no publicas bolsas. Parte con la de hoy.'),
-              for (final bag in bags)
-                Card(
-                  child: ListTile(
-                    leading: ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: SizedBox(width: 52, height: 52, child: BagImage(url: bag.imageUrl, iconSize: 20)),
-                    ),
-                    title: Text('${bag.title} · ${formatClp(bag.price)}${bag.templateId != null ? ' · recurrente' : ''}'),
-                    subtitle: Text(
-                      '${formatPickup(bag.pickupStart, bag.pickupEnd)} · '
-                      'Quedan ${bag.quantityAvailable}',
-                    ),
-                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Switch(value: bag.active, onChanged: (v) => Repository.instance.setBagActive(bag.id, v)),
-                      if (bag.pickupEnd.isAfter(DateTime.now()))
-                        PopupMenuButton<String>(
-                          tooltip: 'Más opciones',
-                          onSelected: (_) => _cancelBag(context, bag),
-                          itemBuilder: (_) => const [
-                            PopupMenuItem(value: 'cancel', child: Text('Cancelar la bolsa de hoy')),
-                          ],
+    return Reloadable(builder: (context) => StreamBuilder<List<Bag>>(
+      stream: Repository.instance.watchStoreBags(store.id),
+      builder: (context, snap) {
+        final bags = snap.data ?? const <Bag>[];
+        final now = DateTime.now();
+        final current = bags.where((b) => b.pickupEnd.isAfter(now)).toList().reversed.toList();
+        final past = bags.where((b) => !b.pickupEnd.isAfter(now)).toList();
+        // "Igual que ayer": la bolsa publicada más reciente.
+        final latest = bags.isEmpty ? null : bags.first;
+        return Scaffold(
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: () => publishBag(context, store, from: latest),
+            icon: const Icon(Icons.add),
+            label: const Text('Publicar bolsa'),
+          ),
+          body: snap.hasError
+              ? ErrorRetry(title: 'No pudimos cargar tus bolsas', error: snap.error)
+              : !snap.hasData
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+                      children: [
+                        _ProfileCard(store: store),
+                        const SizedBox(height: 12),
+                        _ToPickUp(storeId: store.id),
+                        const SizedBox(height: 24),
+                        Text('Hoy y próximas', style: Theme.of(context).textTheme.titleMedium),
+                        const SizedBox(height: 8),
+                        if (current.isEmpty)
+                          Text(
+                            latest == null
+                                ? 'Aún no publicas bolsas. Parte con la de hoy.'
+                                : 'No tienes bolsas publicadas para hoy. "Publicar bolsa" parte con los datos de la última.',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: WoowfyColors.muted),
+                          ),
+                        for (final bag in current) _BagTile(store: store, bag: bag),
+                        const SizedBox(height: 24),
+                        _Templates(store: store),
+                        const SizedBox(height: 16),
+                        Card(
+                          child: ListTile(
+                            leading: const Icon(Icons.payments_outlined, color: WoowfyColors.green),
+                            title: const Text('Ventas y pagos'),
+                            subtitle: const Text('Lo vendido, lo que Woowfy te pagó y opiniones'),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => context.go('/merchant/sales'),
+                          ),
                         ),
-                    ]),
-                  ),
-                ),
-            ],
-          );
-        },
-      )),
-    );
+                        if (past.isNotEmpty)
+                          Theme(
+                            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                            child: ExpansionTile(
+                              tilePadding: EdgeInsets.zero,
+                              title: Text('Anteriores (${past.length})', style: Theme.of(context).textTheme.titleMedium),
+                              children: [for (final bag in past) _BagTile(store: store, bag: bag)],
+                            ),
+                          ),
+                        const SizedBox(height: 8),
+                        const _GuideCard(),
+                      ],
+                    ),
+        );
+      },
+    ));
   }
 }
 
@@ -312,44 +391,52 @@ class _ToPickUp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: StreamBuilder<List<BagOrder>>(
-          stream: Repository.instance.watchStoreOrdersToPickUp(storeId),
-          builder: (context, snap) {
-            final orders = snap.data ?? const <BagOrder>[];
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        snap.hasError
-                            ? 'No pudimos cargar los pedidos.'
-                            : 'Por retirar: ${orders.length}',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ),
-                    FilledButton.icon(
-                      onPressed: () => openCounter(context, pending: snap.hasData ? orders.length : null),
-                      icon: const Icon(Icons.qr_code_scanner),
-                      label: const Text('Validar retiro'),
-                    ),
-                  ],
+    final t = Theme.of(context).textTheme;
+    final cream = t.bodyMedium?.copyWith(color: WoowfyColors.cream);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: WoowfyColors.green, borderRadius: BorderRadius.circular(20)),
+      child: StreamBuilder<List<BagOrder>>(
+        stream: Repository.instance.watchStoreOrdersToPickUp(storeId),
+        builder: (context, snap) {
+          final orders = snap.data ?? const <BagOrder>[];
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Ahora', style: t.titleMedium?.copyWith(color: WoowfyColors.lime)),
+              Text(
+                snap.hasError
+                    ? 'No pudimos cargar los pedidos.'
+                    : !snap.hasData
+                        ? 'Cargando pedidos…'
+                        : orders.isEmpty
+                            ? 'Nadie por retirar en este momento'
+                            : '${orders.length} por retirar',
+                style: t.titleLarge?.copyWith(color: WoowfyColors.cream),
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                onPressed: () => openCounter(context, pending: snap.hasData ? orders.length : null),
+                icon: const Icon(Icons.qr_code_scanner),
+                label: const Text('Validar retiro'),
+              ),
+              for (final o in orders.take(5))
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Row(children: [
+                    Expanded(child: Text('${o.bagTitle} · ${formatPickup(o.pickupStart, o.pickupEnd)}', style: cream)),
+                    Text(formatClp(o.amount), style: cream),
+                  ]),
                 ),
-                for (final o in orders)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(o.bagTitle),
-                    subtitle: Text('Retiro ${formatPickup(o.pickupStart, o.pickupEnd)}'),
-                    trailing: Text(formatClp(o.amount)),
-                  ),
-              ],
-            );
-          },
-        ),
+              if (orders.length > 5)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text('y ${orders.length - 5} más', style: t.bodySmall?.copyWith(color: WoowfyColors.cream)),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -384,10 +471,10 @@ class _ProfileCard extends StatelessWidget {
                   if (store.hours.isNotEmpty) Text(store.hours, style: t.bodySmall?.copyWith(color: WoowfyColors.muted)),
                 ]),
               ),
-              OutlinedButton.icon(
+              IconButton(
+                tooltip: 'Editar perfil del local',
                 onPressed: () => showDialog<void>(context: context, builder: (_) => StoreProfileDialog(store: store)),
-                icon: const Icon(Icons.edit_outlined, size: 18),
-                label: const Text('Editar'),
+                icon: const Icon(Icons.edit_outlined),
               ),
             ]),
             if (incomplete) ...[
@@ -411,15 +498,15 @@ class _ProfileCard extends StatelessWidget {
 
 /// Bolsas recurrentes del local: se publican solas los días elegidos.
 class _Templates extends StatelessWidget {
-  const _Templates({required this.storeId});
+  const _Templates({required this.store});
 
-  final String storeId;
+  final Store store;
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     return StreamBuilder<List<BagTemplate>>(
-      stream: Repository.instance.watchTemplates(storeId),
+      stream: Repository.instance.watchTemplates(store.id),
       builder: (context, snap) {
         final templates = snap.data ?? const <BagTemplate>[];
         return Column(
@@ -441,7 +528,19 @@ class _Templates extends StatelessWidget {
                   title: Text('${tpl.title} · ${formatClp(tpl.price)}'),
                   subtitle: Text('${tpl.daysLabel} · ${tpl.pickupStart} – ${tpl.pickupEnd} · ${tpl.quantity} bolsas'),
                   trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Switch(value: tpl.active, onChanged: (v) => Repository.instance.setTemplateActive(tpl.id, v)),
+                    Semantics(
+                      label: 'Se publica sola: ${tpl.title}',
+                      child: Switch(value: tpl.active, onChanged: (v) => Repository.instance.setTemplateActive(tpl.id, v)),
+                    ),
+                    IconButton(
+                      tooltip: 'Editar',
+                      icon: const Icon(Icons.edit_outlined),
+                      onPressed: () => showDialog<void>(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (_) => PublishBagDialog(store: store, editTemplate: tpl),
+                      ),
+                    ),
                     IconButton(
                       tooltip: 'Eliminar',
                       icon: const Icon(Icons.delete_outline),
@@ -466,6 +565,78 @@ class _Templates extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// Publica (vacía o "igual que" [from]) y, al terminar, ofrece verla como cliente. Tocar fuera no la cierra.
+Future<void> publishBag(BuildContext context, Store store, {Bag? from}) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final router = GoRouter.of(context);
+  final id = await showDialog<String>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => PublishBagDialog(store: store, from: from),
+  );
+  if (id == null) return;
+  messenger.showSnackBar(SnackBar(
+    content: const Text('Bolsa publicada: ya la ven los clientes.'),
+    action: SnackBarAction(label: 'Ver como cliente', onPressed: () => router.go('/bag/$id')),
+  ));
+}
+
+/// Una bolsa en el panel: visible o no, y menú con editar, publicar de nuevo y cancelar.
+class _BagTile extends StatelessWidget {
+  const _BagTile({required this.store, required this.bag});
+
+  final Store store;
+  final Bag bag;
+
+  @override
+  Widget build(BuildContext context) {
+    final upcoming = bag.pickupEnd.isAfter(DateTime.now());
+    return Card(
+      child: ListTile(
+        leading: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: SizedBox(width: 52, height: 52, child: BagImage(url: bag.imageUrl, iconSize: 20)),
+        ),
+        title: Text('${bag.title} · ${formatClp(bag.price)}'),
+        subtitle: Text([
+          formatPickup(bag.pickupStart, bag.pickupEnd),
+          if (upcoming) 'Quedan ${bag.quantityAvailable}',
+          if (bag.templateId != null) 'recurrente',
+        ].join(' · ')),
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (upcoming)
+            Semantics(
+              label: 'Visible para clientes: ${bag.title}',
+              child: Switch(value: bag.active, onChanged: (v) => Repository.instance.setBagActive(bag.id, v)),
+            ),
+          PopupMenuButton<String>(
+            tooltip: 'Más opciones',
+            onSelected: (v) => switch (v) {
+              'edit' => showDialog<void>(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (_) => PublishBagDialog(store: store, editBag: bag),
+                ),
+              'again' => publishBag(context, store, from: bag),
+              _ => _cancelBag(context, bag),
+            },
+            itemBuilder: (_) => [
+              if (upcoming)
+                const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit_outlined), title: Text('Editar'))),
+              const PopupMenuItem(value: 'again', child: ListTile(leading: Icon(Icons.copy_outlined), title: Text('Publicar de nuevo'))),
+              if (upcoming)
+                const PopupMenuItem(
+                  value: 'cancel',
+                  child: ListTile(leading: Icon(Icons.cancel_outlined), title: Text('Cancelar la bolsa de hoy')),
+                ),
+            ],
+          ),
+        ]),
+      ),
     );
   }
 }
@@ -504,8 +675,8 @@ Future<void> _cancelBag(BuildContext context, Bag bag) async {
     messenger.showSnackBar(SnackBar(
       content: Text(n == 0 ? 'Bolsa cancelada. Nadie la había comprado.' : 'Bolsa cancelada. Reembolsamos y avisamos a $n ${n == 1 ? 'cliente' : 'clientes'}.'),
     ));
-  } on FirebaseFunctionsException catch (e) {
-    messenger.showSnackBar(SnackBar(content: Text(e.message ?? 'No se pudo cancelar.')));
+  } catch (e) {
+    messenger.showSnackBar(SnackBar(content: Text(friendlyError(e, fallback: 'No se pudo cancelar. Intenta de nuevo.'))));
   }
 }
 

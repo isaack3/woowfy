@@ -354,6 +354,13 @@ class _StoreReviews extends StatelessWidget {
   }
 }
 
+/// Abre el formulario de la cuenta bancaria (con los datos actuales, si hay).
+Future<void> showBankAccountDialog(BuildContext context, String storeId) async {
+  final account = await Repository.instance.getBankAccount(storeId).catchError((_) => null);
+  if (!context.mounted) return;
+  await showDialog<void>(context: context, builder: (_) => _BankDialog(storeId: storeId, initial: account));
+}
+
 /// Cuenta donde el local recibe sus liquidaciones. Es privada: solo la ven el dueño y el admin.
 class _BankCard extends StatelessWidget {
   const _BankCard({required this.storeId});

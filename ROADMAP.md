@@ -1,7 +1,7 @@
 # Woowfy — Hoja de ruta
 
 Marketplace de bolsas sorpresa contra el desperdicio de comida. Chile primero, luego Latam.
-Marca las casillas a medida que avancemos. Última actualización: 10-10-2026 (ronda 4: primera visita).
+Marca las casillas a medida que avancemos. Última actualización: 10-10-2026 (ronda 5: comercio).
 
 **En línea:** [woowfy.com](https://woowfy.com) (landing) · [app.woowfy.com](https://app.woowfy.com) (app)
 
@@ -209,6 +209,15 @@ Puntajes (heurísticas de Nielsen): Home 22/40 · flujo cliente 22/40 · comerci
 - [x] Bolsa sin foto con ilustración "Bolsa sorpresa" (no un ícono de imagen rota); tarjeta que crece con letra grande
 - [x] Login con contexto también para Mis pedidos, un pedido y el panel; la flecha vuelve a la bolsa
 - [x] Controles de la Home de al menos 44 px
+
+**Ronda 5 — comercio ✅** (probada en emuladores y desplegada el 10-10)
+- [x] Panel ordenado por uso: bloque "Ahora · N por retirar" con "Validar retiro" grande, luego "Hoy y próximas", recurrentes, ventas y "Anteriores" plegadas; perfil con ícono de editar
+- [x] "Mi local" en la barra de la app para quien tiene un local aprobado
+- [x] Publicar "igual que ayer": el formulario parte con los datos (y la foto) de la última bolsa; "Publicar de nuevo" en cada bolsa
+- [x] Editar bolsas (nombre, descripción, precios, sumar unidades) y recurrentes; con compradores, el horario queda fijo
+- [x] Mientras te aprueban: checklist con logo y horario, cuenta bancaria y guía (plazo "normalmente 1 día hábil"); el envío de la solicitud ya no falla en silencio
+- [x] Publicar no se cierra al tocar fuera; "Bolsa publicada · Ver como cliente"
+- [x] Interruptores con nombre para lectores de pantalla; menú ⋮ con Editar, Publicar de nuevo y Cancelar
 
 ### Próximo (por decidir)
 - [ ] Empleados por local, reclamos y moderación de opiniones, invitar amigos (referidos)

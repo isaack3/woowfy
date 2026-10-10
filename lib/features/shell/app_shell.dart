@@ -1,29 +1,51 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme.dart';
+import '../../data/models.dart';
+import '../../data/repository.dart';
 
-/// Navegación principal del cliente: barra inferior en móvil, riel lateral en pantallas anchas.
+typedef _Tab = ({String path, IconData icon, IconData selected, String label});
+
+/// Navegación principal: barra inferior en móvil, riel lateral en pantallas anchas.
+/// Si la persona tiene un local aprobado, suma "Mi local" (acceso directo al panel y al mostrador).
 class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.location, required this.child});
 
   final String location;
   final Widget child;
 
-  static const _tabs = [
+  static const List<_Tab> _base = [
     (path: '/', icon: Icons.shopping_bag_outlined, selected: Icons.shopping_bag, label: 'Bolsas'),
     (path: '/orders', icon: Icons.receipt_long_outlined, selected: Icons.receipt_long, label: 'Mis pedidos'),
     (path: '/account', icon: Icons.person_outline, selected: Icons.person, label: 'Cuenta'),
   ];
-
-  int get _index {
-    final i = _tabs.indexWhere((t) => t.path != '/' && location.startsWith(t.path));
-    return i == -1 ? 0 : i;
-  }
+  static const _Tab _store = (path: '/merchant', icon: Icons.storefront_outlined, selected: Icons.storefront, label: 'Mi local');
 
   @override
   Widget build(BuildContext context) {
-    void go(int i) => context.go(_tabs[i].path);
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      initialData: FirebaseAuth.instance.currentUser,
+      builder: (context, auth) {
+        final uid = auth.data?.uid;
+        if (uid == null) return _build(context, _base);
+        return StreamBuilder<Store?>(
+          stream: Repository.instance.watchMyStore(uid),
+          builder: (context, snap) {
+            final approved = snap.data?.approved ?? false;
+            return _build(context, approved ? [_base[0], _base[1], _store, _base[2]] : _base);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _build(BuildContext context, List<_Tab> tabs) {
+    final i = tabs.indexWhere((t) => t.path != '/' && location.startsWith(t.path));
+    final index = i == -1 ? 0 : i;
+    void go(int i) => context.go(tabs[i].path);
     final wide = MediaQuery.sizeOf(context).width >= 800;
 
     if (wide) {
@@ -31,7 +53,7 @@ class AppShell extends StatelessWidget {
         body: Row(
           children: [
             NavigationRail(
-              selectedIndex: _index,
+              selectedIndex: index,
               onDestinationSelected: go,
               labelType: NavigationRailLabelType.all,
               leading: Padding(
@@ -39,7 +61,7 @@ class AppShell extends StatelessWidget {
                 child: Image.asset('assets/brand/woowfy-isotipo.png', height: 34),
               ),
               destinations: [
-                for (final t in _tabs)
+                for (final t in tabs)
                   NavigationRailDestination(icon: Icon(t.icon), selectedIcon: Icon(t.selected), label: Text(t.label)),
               ],
             ),
@@ -51,11 +73,11 @@ class AppShell extends StatelessWidget {
     return Scaffold(
       body: child,
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
+        selectedIndex: index,
         onDestinationSelected: go,
         height: 68,
         destinations: [
-          for (final t in _tabs)
+          for (final t in tabs)
             NavigationDestination(icon: Icon(t.icon), selectedIcon: Icon(t.selected), label: t.label),
         ],
       ),
