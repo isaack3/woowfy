@@ -2,10 +2,26 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/in_app_browser.dart';
 import '../../core/legal.dart';
 import '../../core/theme.dart';
+import '../../data/repository.dart';
+
+/// Crea `users/{uid}` la primera vez (registro con correo o primer ingreso con Google, también por redirección).
+Future<void> ensureUserProfile(User user, {String? name}) async {
+  final ref = FirebaseFirestore.instance.doc('users/${user.uid}');
+  if ((await ref.get()).exists) return;
+  await ref.set({
+    'email': user.email,
+    'name': (name ?? user.displayName ?? '').trim(),
+    'role': 'customer',
+    'createdAt': FieldValue.serverTimestamp(),
+  });
+}
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key, this.redirectTo = '/'});
@@ -23,7 +39,23 @@ class _LoginPageState extends State<LoginPage> {
   final _password = TextEditingController();
   bool _register = false;
   bool _loading = false;
+  bool _showPassword = false;
   String? _error;
+
+  /// Si viene de "Reservar" en una bolsa: el local, para decir para qué se pide ingresar.
+  String? _reserveStore;
+
+  @override
+  void initState() {
+    super.initState();
+    final target = Uri.tryParse(widget.redirectTo);
+    if (target != null && target.queryParameters['resume'] == '1' && target.pathSegments.length == 2 &&
+        target.pathSegments.first == 'bag') {
+      Repository.instance.watchBag(target.pathSegments[1]).first.then((bag) {
+        if (mounted && bag != null) setState(() => _reserveStore = bag.storeName);
+      }).catchError((_) {});
+    }
+  }
 
   @override
   void dispose() {
@@ -31,18 +63,6 @@ class _LoginPageState extends State<LoginPage> {
     _email.dispose();
     _password.dispose();
     super.dispose();
-  }
-
-  /// Crea `users/{uid}` la primera vez (registro con correo o primer ingreso con Google).
-  Future<void> _ensureProfile(User user, {String? name}) async {
-    final ref = FirebaseFirestore.instance.doc('users/${user.uid}');
-    if ((await ref.get()).exists) return;
-    await ref.set({
-      'email': user.email,
-      'name': (name ?? user.displayName ?? '').trim(),
-      'role': 'customer',
-      'createdAt': FieldValue.serverTimestamp(),
-    });
   }
 
   Future<void> _run(Future<void> Function() action) async {
@@ -69,7 +89,7 @@ class _LoginPageState extends State<LoginPage> {
       if (_register) {
         final cred = await auth.createUserWithEmailAndPassword(email: _email.text.trim(), password: _password.text);
         await cred.user!.updateDisplayName(_name.text.trim());
-        await _ensureProfile(cred.user!, name: _name.text);
+        await ensureUserProfile(cred.user!, name: _name.text);
       } else {
         await auth.signInWithEmailAndPassword(email: _email.text.trim(), password: _password.text);
       }
@@ -80,9 +100,33 @@ class _LoginPageState extends State<LoginPage> {
     final provider = GoogleAuthProvider()..setCustomParameters({'prompt': 'select_account'});
     final auth = FirebaseAuth.instance;
     await _run(() async {
-      final cred = kIsWeb ? await auth.signInWithPopup(provider) : await auth.signInWithProvider(provider);
-      await _ensureProfile(cred.user!);
+      if (!kIsWeb) {
+        await ensureUserProfile((await auth.signInWithProvider(provider)).user!);
+        return;
+      }
+      try {
+        await ensureUserProfile((await auth.signInWithPopup(provider)).user!);
+      } on FirebaseAuthException catch (e) {
+        if (e.code != 'popup-blocked') rethrow;
+        // Sin ventanas emergentes: el ingreso sigue en esta misma pestaña y vuelve aquí (ver main.dart).
+        await auth.signInWithRedirect(provider);
+      }
     });
+  }
+
+  /// En Android, abre esta misma página en Chrome (fuera del navegador interno de la app).
+  Future<void> _openInChrome() async {
+    final here = Uri.base;
+    final intent = 'intent://${here.authority}${here.path}${here.hasQuery ? '?${here.query}' : ''}'
+        '#Intent;scheme=https;package=com.android.chrome;end';
+    await launchUrl(Uri.parse(intent));
+  }
+
+  Future<void> _copyLink() async {
+    await Clipboard.setData(ClipboardData(text: Uri.base.toString()));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enlace copiado. Pégalo en Safari o Chrome.')));
+    }
   }
 
   Future<void> _forgotPassword() async {
@@ -131,13 +175,26 @@ class _LoginPageState extends State<LoginPage> {
                   const Center(child: WoowfyLogo(size: 40)),
                   const SizedBox(height: 24),
                   Text(_register ? 'Crea tu cuenta' : 'Ingresa a Woowfy', style: t.headlineSmall),
+                  if (_reserveStore != null) ...[
+                    const SizedBox(height: 4),
+                    Text('Para reservar tu bolsa de $_reserveStore. Después vuelves a la bolsa.',
+                        style: t.bodyMedium?.copyWith(color: WoowfyColors.muted)),
+                  ],
                   const SizedBox(height: 24),
-                  OutlinedButton.icon(
-                    onPressed: _loading ? null : _google,
-                    icon: const _GoogleMark(),
-                    label: const Text('Continuar con Google'),
-                    style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-                  ),
+                  if (InAppBrowser.appName != null)
+                    _InAppNotice(
+                      app: InAppBrowser.appName!,
+                      android: InAppBrowser.isAndroid,
+                      onOpenInChrome: _openInChrome,
+                      onCopyLink: _copyLink,
+                    )
+                  else
+                    OutlinedButton.icon(
+                      onPressed: _loading ? null : _google,
+                      icon: const _GoogleMark(),
+                      label: const Text('Continuar con Google'),
+                      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                    ),
                   const SizedBox(height: 20),
                   Row(children: [
                     const Expanded(child: Divider()),
@@ -165,9 +222,16 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _password,
-                    obscureText: true,
+                    obscureText: !_showPassword,
                     autofillHints: [_register ? AutofillHints.newPassword : AutofillHints.password],
-                    decoration: const InputDecoration(labelText: 'Contraseña'),
+                    decoration: InputDecoration(
+                      labelText: 'Contraseña',
+                      suffixIcon: IconButton(
+                        tooltip: _showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña',
+                        icon: Icon(_showPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                        onPressed: () => setState(() => _showPassword = !_showPassword),
+                      ),
+                    ),
                     validator: (v) => (v == null || v.length < 6) ? 'Mínimo 6 caracteres' : null,
                     onFieldSubmitted: (_) => _submit(),
                   ),
@@ -206,6 +270,44 @@ class _LoginPageState extends State<LoginPage> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Aviso dentro del navegador de Instagram, Facebook, etc.: Google no deja ingresar ahí.
+class _InAppNotice extends StatelessWidget {
+  const _InAppNotice({required this.app, required this.android, required this.onOpenInChrome, required this.onCopyLink});
+
+  final String app;
+  final bool android;
+  final VoidCallback onOpenInChrome;
+  final VoidCallback onCopyLink;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: WoowfyColors.orangeSoft, borderRadius: BorderRadius.circular(16)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text('Estás en el navegador de $app', style: t.titleSmall?.copyWith(fontWeight: FontWeight.w900)),
+        const SizedBox(height: 4),
+        Text(
+          android
+              ? 'Google no permite ingresar aquí. Ábrelo en Chrome para usar tu cuenta de Google, o ingresa con tu correo.'
+              : 'Google no permite ingresar aquí. Toca ··· arriba y elige "Abrir en el navegador", o ingresa con tu correo.',
+          style: t.bodyMedium,
+        ),
+        const SizedBox(height: 10),
+        if (android)
+          FilledButton(onPressed: onOpenInChrome, child: const Text('Abrir en Chrome'))
+        else
+          OutlinedButton.icon(
+            onPressed: onCopyLink,
+            icon: const Icon(Icons.link, size: 18),
+            label: const Text('Copiar enlace'),
+          ),
+      ]),
     );
   }
 }

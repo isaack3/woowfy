@@ -1,7 +1,7 @@
 # Woowfy — Hoja de ruta
 
 Marketplace de bolsas sorpresa contra el desperdicio de comida. Chile primero, luego Latam.
-Marca las casillas a medida que avancemos. Última actualización: 09-10-2026 (crítica de diseño, ronda 2 tanda A).
+Marca las casillas a medida que avancemos. Última actualización: 09-10-2026 (crítica de diseño, ronda 2 tanda B).
 
 **En línea:** [woowfy.com](https://woowfy.com) (landing) · [app.woowfy.com](https://app.woowfy.com) (app)
 
@@ -172,9 +172,14 @@ Puntajes (heurísticas de Nielsen): Home 22/40 · flujo cliente 22/40 · comerci
 - [x] Selector de región (todo Chile o una de las 16, con cuántas bolsas hay); se recuerda en el navegador. La ubicación se explica antes de pedirla y el mapa encuadra las bolsas (ya no supone Santiago)
 - [x] Home vacía con salida: cómo funciona, "Avísame" (lista de espera de woowfy.com) y "¿Tienes un local?" (guía para comercios)
 
+**Ronda 2 — tanda B ✅** (probada en emuladores y desplegada el 09-10)
+- [x] Navegadores internos (Instagram, Facebook, TikTok, LinkedIn…): aviso con "Abrir en Chrome" (Android) o cómo abrir en el navegador y "Copiar enlace" (iPhone); queda el ingreso con correo. Si se bloquea la ventana de Google, sigue por redirección
+- [x] Login con contexto ("Para reservar tu bolsa de {local}") y botón para ver la contraseña
+- [x] Retomar la reserva: al ingresar vuelve a la bolsa con "Listo, ya ingresaste" y el botón destacado (un toque, nada se reserva solo)
+- [x] Modo mostrador: cámara abierta, pantalla verde "Entrega: {bolsa} · Pagado $X" que sigue sola en 3 s, pantalla coral "No entregues" (ya retirado, código no válido, horario terminado) que espera un toque, vibración y "Por retirar: N"
+- [x] Errores del servidor sin el sufijo técnico ("[404]") y "ya fue retirado" bien traducido
+
 **Ronda 2 — por hacer**
-- [ ] Ingreso con Google dentro de WhatsApp/Instagram (navegador interno) y retomar la reserva después del login
-- [ ] "Modo mostrador" para validar retiros en fila (escaneo continuo, confirmación grande, alerta de "ya retirado")
 - [ ] Landing: hero sin comercios inventados, menos recursos de plantilla, contraste del coral
 
 ### Próximo (por decidir)

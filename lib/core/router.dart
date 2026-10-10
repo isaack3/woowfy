@@ -40,7 +40,10 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/bag/:id',
-      builder: (context, state) => BagDetailPage(bagId: state.pathParameters['id']!),
+      builder: (context, state) => BagDetailPage(
+        bagId: state.pathParameters['id']!,
+        resume: state.uri.queryParameters['resume'] == '1',
+      ),
     ),
     GoRoute(
       path: '/login',

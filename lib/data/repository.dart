@@ -401,9 +401,10 @@ class Repository {
       functions.httpsCallable('confirmMockPayment').call({'orderId': orderId, 'approved': approved});
 
   /// El comercio valida el código/QR del cliente. Devuelve el nombre de la bolsa retirada.
-  Future<String> redeemOrder(String code) async {
+  /// Valida el código de retiro en el local. Devuelve la bolsa y el monto pagado (para saber qué entregar).
+  Future<({String bagTitle, int amount})> redeemOrder(String code) async {
     final res = await functions.httpsCallable('redeemOrder').call<Map<String, dynamic>>({'code': code});
-    return res.data['bagTitle'] as String;
+    return (bagTitle: res.data['bagTitle'] as String, amount: (res.data['amount'] as num?)?.toInt() ?? 0);
   }
 
   /// Código de retiro del pedido: está en un documento que solo puede leer el cliente.

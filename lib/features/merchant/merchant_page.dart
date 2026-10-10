@@ -13,7 +13,7 @@ import '../../data/models.dart';
 import '../../data/repository.dart';
 import '../bags/bag_image.dart';
 import 'publish_bag_dialog.dart';
-import 'redeem_dialog.dart';
+import 'counter.dart';
 import 'store_profile_dialog.dart';
 
 /// Panel del comercio: solicitar alta, y una vez aprobado, publicar bolsas del día.
@@ -333,7 +333,7 @@ class _ToPickUp extends StatelessWidget {
                       ),
                     ),
                     FilledButton.icon(
-                      onPressed: () => showDialog<void>(context: context, builder: (_) => const RedeemDialog()),
+                      onPressed: () => openCounter(context, pending: snap.hasData ? orders.length : null),
                       icon: const Icon(Icons.qr_code_scanner),
                       label: const Text('Validar retiro'),
                     ),

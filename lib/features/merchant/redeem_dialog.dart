@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/errors.dart';
+import '../../core/format.dart';
 import '../../core/web_qr.dart';
 import '../../data/repository.dart';
 import 'qr_scanner_page.dart';
@@ -43,11 +44,11 @@ class _RedeemDialogState extends State<RedeemDialog> {
       _error = null;
     });
     try {
-      final bagTitle = await Repository.instance.redeemOrder(_code.text);
+      final r = await Repository.instance.redeemOrder(_code.text);
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Entregado: $bagTitle')),
+        SnackBar(content: Text('Entrega: ${r.bagTitle} · pagado ${formatClp(r.amount)}')),
       );
     } catch (e) {
       if (mounted) setState(() => _error = friendlyError(e, fallback: 'No pudimos validar el código. Intenta de nuevo.'));

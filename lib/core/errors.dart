@@ -6,6 +6,7 @@ import 'theme.dart';
 
 /// Códigos de Cloud Functions cuyo mensaje lo escribimos nosotros (en español) y se puede mostrar tal cual.
 const _ownMessageCodes = {
+  'aborted',
   'failed-precondition',
   'not-found',
   'permission-denied',
@@ -20,7 +21,8 @@ const _ownMessageCodes = {
 String friendlyError(Object error, {String fallback = 'Algo salió mal. Intenta de nuevo.'}) {
   debugPrint('Error: $error');
   if (error is FirebaseFunctionsException) {
-    final message = error.message;
+    // En web el mensaje puede llegar con el código HTTP al final ("Código no válido. [404]"): se quita.
+    final message = error.message?.replaceFirst(RegExp(r'\s*\[[\w-]+\]\s*$'), '');
     if (_ownMessageCodes.contains(error.code) && message != null && message.isNotEmpty) return message;
     if (error.code == 'unavailable' || error.code == 'deadline-exceeded') return _offline;
     return fallback;

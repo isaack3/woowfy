@@ -15,9 +15,12 @@ import 'bag_image.dart';
 import 'stars.dart';
 
 class BagDetailPage extends StatelessWidget {
-  const BagDetailPage({super.key, required this.bagId});
+  const BagDetailPage({super.key, required this.bagId, this.resume = false});
 
   final String bagId;
+
+  /// Vuelve del login después de tocar "Reservar": se destaca el botón para seguir con un toque.
+  final bool resume;
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +52,7 @@ class BagDetailPage extends StatelessWidget {
                 ? const Center(child: CircularProgressIndicator())
                 : bag == null
                 ? const Center(child: Text('Bolsa no encontrada.'))
-                : _Detail(bag: bag),
+                : _Detail(bag: bag, resume: resume && FirebaseAuth.instance.currentUser != null),
           );
         },
       ),
@@ -116,9 +119,10 @@ class _FavoriteButton extends StatelessWidget {
 }
 
 class _Detail extends StatelessWidget {
-  const _Detail({required this.bag});
+  const _Detail({required this.bag, this.resume = false});
 
   final Bag bag;
+  final bool resume;
 
   @override
   Widget build(BuildContext context) {
@@ -233,7 +237,7 @@ class _Detail extends StatelessWidget {
             ),
             if (!bag.soldOut) ...[const SizedBox(height: 12), const _Rules()],
             const SizedBox(height: 16),
-            _ReserveButton(bag: bag),
+            if (resume && !bag.soldOut) _ResumeReserve(bag: bag) else _ReserveButton(bag: bag),
             const _FeeSplit(),
             if (bag.storeRatingCount > 0) ...[const SizedBox(height: 24), _Reviews(storeId: bag.storeId)],
             const SizedBox(height: 12),
@@ -245,6 +249,47 @@ class _Detail extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Después del login: "Listo, ya ingresaste" y el botón de reservar destacado (nada se reserva sin tocarlo).
+class _ResumeReserve extends StatefulWidget {
+  const _ResumeReserve({required this.bag});
+
+  final Bag bag;
+
+  @override
+  State<_ResumeReserve> createState() => _ResumeReserveState();
+}
+
+class _ResumeReserveState extends State<_ResumeReserve> {
+  final _key = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _key.currentContext;
+      if (ctx != null) Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 400), alignment: .5);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: _key,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: WoowfyColors.limeSoft, borderRadius: BorderRadius.circular(18)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          const Icon(Icons.check_circle_outline, color: WoowfyColors.green),
+          const SizedBox(width: 8),
+          Expanded(child: Text('Listo, ya ingresaste. Te queda un paso:', style: Theme.of(context).textTheme.titleSmall)),
+        ]),
+        const SizedBox(height: 10),
+        _ReserveButton(bag: widget.bag),
+      ]),
     );
   }
 }
@@ -263,7 +308,7 @@ class _ReserveButtonState extends State<_ReserveButton> {
 
   Future<void> _reserve() async {
     if (FirebaseAuth.instance.currentUser == null) {
-      context.go('/login?from=${Uri.encodeComponent('/bag/${widget.bag.id}')}');
+      context.go('/login?from=${Uri.encodeComponent('/bag/${widget.bag.id}?resume=1')}');
       return;
     }
     setState(() => _busy = true);
