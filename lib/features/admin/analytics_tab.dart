@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../core/errors.dart';
 import '../../core/theme.dart';
 import '../../data/models.dart';
 import '../../data/repository.dart';
@@ -60,7 +61,11 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
         stream: _orders,
         builder: (context, ordersSnap) {
           if (statsSnap.hasError || ordersSnap.hasError) {
-            return Center(child: Text('No pudimos cargar la analítica: ${statsSnap.error ?? ordersSnap.error}'));
+            return ErrorRetry(
+              title: 'No pudimos cargar la analítica',
+              error: statsSnap.error ?? ordersSnap.error,
+              onRetry: () => setState(_load),
+            );
           }
           final days = statsSnap.data;
           final orders = ordersSnap.data;

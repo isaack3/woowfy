@@ -19,6 +19,43 @@ class WaitlistTab extends StatefulWidget {
 
 class _WaitlistTabState extends State<WaitlistTab> {
   bool? _merchants; // null = todos
+  String _query = '';
+
+  bool _matches(WaitlistEntry e) {
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    return [e.name, e.email, e.businessName, e.comuna, e.region]
+        .whereType<String>()
+        .any((v) => v.toLowerCase().contains(q));
+  }
+
+  /// Borra sus datos de la lista de espera (lo que promete la landing al inscribirse).
+  Future<void> _delete(BuildContext context, WaitlistEntry e) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Borrar sus datos'),
+        content: Text('Se eliminará a ${e.name.isEmpty ? e.email : '${e.name} (${e.email})'} de la lista de espera. '
+            'Esto no se puede deshacer.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Borrar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await Repository.instance.deleteWaitlistEntry(e.id);
+      messenger.showSnackBar(SnackBar(content: Text('Datos de ${e.email} borrados.')));
+    } catch (err) {
+      messenger.showSnackBar(SnackBar(content: Text(friendlyError(err, fallback: 'No se pudo borrar. Intenta de nuevo.'))));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,12 +66,20 @@ class _WaitlistTabState extends State<WaitlistTab> {
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         final all = snap.data!;
         final merchants = all.where((e) => e.isMerchant).length;
-        final shown = _merchants == null ? all : all.where((e) => e.isMerchant == _merchants).toList();
+        final shown = (_merchants == null ? all : all.where((e) => e.isMerchant == _merchants)).where(_matches).toList();
 
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
             const _LaunchCard(),
+            const SizedBox(height: 12),
+            TextField(
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search),
+                hintText: 'Buscar por nombre, correo o comuna',
+              ),
+              onChanged: (v) => setState(() => _query = v),
+            ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
@@ -63,7 +108,11 @@ class _WaitlistTabState extends State<WaitlistTab> {
               ],
             ),
             const SizedBox(height: 12),
-            if (shown.isEmpty) const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('Aún no hay inscritos.'))),
+            if (shown.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Center(child: Text(all.isEmpty ? 'Aún no hay inscritos.' : 'Nadie coincide con la búsqueda.')),
+              ),
             for (final e in shown)
               Card(
                 child: ListTile(
@@ -75,14 +124,26 @@ class _WaitlistTabState extends State<WaitlistTab> {
                     if (e.comuna != null) e.comuna!,
                     if (e.region != null) e.region!,
                   ].join(' · ')),
-                  trailing: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      if (e.createdAt != null) Text(_date.format(e.createdAt!), style: Theme.of(context).textTheme.bodySmall),
-                      _EmailBadge(status: e.emailStatus),
-                    ],
-                  ),
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        if (e.createdAt != null) Text(_date.format(e.createdAt!), style: Theme.of(context).textTheme.bodySmall),
+                        _EmailBadge(status: e.emailStatus),
+                      ],
+                    ),
+                    PopupMenuButton<String>(
+                      tooltip: 'Más opciones',
+                      onSelected: (_) => _delete(context, e),
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: ListTile(leading: Icon(Icons.delete_outline), title: Text('Borrar sus datos')),
+                        ),
+                      ],
+                    ),
+                  ]),
                 ),
               ),
           ],
@@ -123,17 +184,17 @@ class _EmailBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (icon, label, color) = switch (status) {
-      'sent' => (Icons.mark_email_read_outlined, 'Bienvenida enviada', Colors.green),
-      'error' => (Icons.error_outline, 'Error al enviar', Theme.of(context).colorScheme.error),
-      'skipped' => (Icons.do_not_disturb_on_outlined, 'Correo apagado', Colors.grey),
-      _ => (Icons.schedule, 'Sin correo', Colors.grey),
+      'sent' => (Icons.mark_email_read_outlined, 'Bienvenida enviada', WoowfyColors.green),
+      'error' => (Icons.error_outline, 'Error al enviar', const Color(0xFFB83A22)),
+      'skipped' => (Icons.do_not_disturb_on_outlined, 'Correo apagado', WoowfyColors.muted),
+      _ => (Icons.schedule, 'Correo pendiente', WoowfyColors.muted),
     };
     return Tooltip(
       message: label,
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(icon, size: 14, color: color),
         const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 11, color: color)),
+        Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
       ]),
     );
   }

@@ -51,7 +51,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(path: '/merchant', builder: (context, state) => const MerchantPage()),
     GoRoute(path: '/merchant/sales', builder: (context, state) => const MerchantSalesPage()),
-    GoRoute(path: '/admin', builder: (context, state) => const AdminPage()),
+    GoRoute(path: '/admin', builder: (context, state) => AdminPage(tab: state.uri.queryParameters['tab'])),
     GoRoute(
       path: '/order/:id',
       builder: (context, state) => OrderPage(orderId: state.pathParameters['id']!),

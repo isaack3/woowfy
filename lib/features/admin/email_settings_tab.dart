@@ -161,6 +161,27 @@ class _FormState extends State<_Form> {
             validator: (v) => email(v, optional: true),
           ),
           const SizedBox(height: 24),
+          // Los cambios solo valen al guardar: se avisa para no perderlos al cambiar de pestaña.
+          ListenableBuilder(
+            listenable: Listenable.merge([_fromName, _fromEmail, _replyTo]),
+            builder: (context, _) {
+              final dirty = _fromName.text != widget.initial.fromName ||
+                  _fromEmail.text != widget.initial.fromEmail ||
+                  _replyTo.text != (widget.initial.replyTo ?? '') ||
+                  _enabled != widget.initial.enabled ||
+                  _orderEmails != widget.initial.orderEmails;
+              if (!dirty) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(children: [
+                  const Icon(Icons.edit_note, size: 18, color: Color(0xFF7A3510)),
+                  const SizedBox(width: 6),
+                  Text('Tienes cambios sin guardar',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: const Color(0xFF7A3510), fontWeight: FontWeight.w700)),
+                ]),
+              );
+            },
+          ),
           Row(
             children: [
               FilledButton(onPressed: _saving ? null : _save, child: Text(_saving ? 'Guardando…' : 'Guardar')),

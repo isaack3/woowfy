@@ -547,9 +547,13 @@ class Payout {
     required this.storeAmount,
     required this.note,
     this.createdAt,
+    this.storeId = '',
+    this.storeName = '',
   });
 
   final String id;
+  final String storeId;
+  final String storeName;
   final int orderCount;
   final int grossAmount;
   final int platformFee;
@@ -567,6 +571,8 @@ class Payout {
       storeAmount: (d['storeAmount'] as num).toInt(),
       note: d['note'] as String? ?? '',
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
+      storeId: d['storeId'] as String? ?? '',
+      storeName: d['storeName'] as String? ?? '',
     );
   }
 }

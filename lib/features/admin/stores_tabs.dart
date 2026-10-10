@@ -49,7 +49,6 @@ class _StoresTabState extends State<StoresTab> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const _PayAllBar(),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: SegmentedButton<StoreStatus>(
@@ -68,10 +67,6 @@ class _StoresTabState extends State<StoresTab> {
             empty: 'No hay comercios en este estado.',
             actions: (store) => switch (store.status) {
               StoreStatus.approved => [
-                  FilledButton.tonal(
-                    onPressed: () => showDialog<void>(context: context, builder: (_) => _PayoutDialog(store: store)),
-                    child: const Text('Liquidar'),
-                  ),
                   OutlinedButton(
                     onPressed: () => _changeStatus(context, store, StoreStatus.suspended,
                         askReason: 'Motivo de la suspensión (lo verá el comercio)'),
@@ -79,10 +74,6 @@ class _StoresTabState extends State<StoresTab> {
                   ),
                 ],
               StoreStatus.suspended => [
-                  OutlinedButton(
-                    onPressed: () => showDialog<void>(context: context, builder: (_) => _PayoutDialog(store: store)),
-                    child: const Text('Liquidar'),
-                  ),
                   FilledButton.tonal(
                     onPressed: () => _changeStatus(context, store, StoreStatus.approved),
                     child: const Text('Activar'),
@@ -231,9 +222,26 @@ Future<void> _changeStatus(BuildContext context, Store store, StoreStatus status
     reason = await showDialog<String>(context: context, builder: (_) => _ReasonDialog(label: askReason));
     if (reason == null) return; // cancelado
   }
+  final previous = store.status;
   try {
     await Repository.instance.setStoreStatus(store.id, status, reason: reason);
-    messenger.showSnackBar(SnackBar(content: Text('${store.name}: ${status.label.toLowerCase()}')));
+    final text = switch (status) {
+      StoreStatus.approved => '${store.name} ya puede publicar bolsas.',
+      StoreStatus.suspended => '${store.name} quedó suspendido: sus bolsas se pausaron.',
+      StoreStatus.rejected => 'Solicitud de ${store.name} rechazada.',
+      StoreStatus.pending => '${store.name} volvió a revisión.',
+    };
+    messenger.showSnackBar(SnackBar(
+      content: Text(text),
+      duration: const Duration(seconds: 8),
+      action: SnackBarAction(
+        label: 'Deshacer',
+        onPressed: () => Repository.instance
+            .setStoreStatus(store.id, previous, reason: store.statusReason)
+            .catchError((Object e) => messenger.showSnackBar(
+                SnackBar(content: Text(friendlyError(e, fallback: 'No se pudo deshacer.'))))),
+      ),
+    ));
   } catch (e) {
     messenger.showSnackBar(SnackBar(content: Text(friendlyError(e, fallback: 'No se pudo actualizar. Intenta de nuevo.'))));
   }
@@ -283,16 +291,17 @@ class _ReasonDialogState extends State<_ReasonDialog> {
 }
 
 /// Registrar el pago al comercio de sus ventas retiradas que aún no se le pagan.
-class _PayoutDialog extends StatefulWidget {
-  const _PayoutDialog({required this.store});
+class PayoutDialog extends StatefulWidget {
+  const PayoutDialog({super.key, required this.storeId, required this.storeName});
 
-  final Store store;
+  final String storeId;
+  final String storeName;
 
   @override
-  State<_PayoutDialog> createState() => _PayoutDialogState();
+  State<PayoutDialog> createState() => _PayoutDialogState();
 }
 
-class _PayoutDialogState extends State<_PayoutDialog> {
+class _PayoutDialogState extends State<PayoutDialog> {
   final _note = TextEditingController();
   bool _saving = false;
 
@@ -306,9 +315,9 @@ class _PayoutDialogState extends State<_PayoutDialog> {
     setState(() => _saving = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final amount = await Repository.instance.createPayout(widget.store.id, _note.text.trim());
+      final amount = await Repository.instance.createPayout(widget.storeId, _note.text.trim());
       if (mounted) Navigator.pop(context);
-      messenger.showSnackBar(SnackBar(content: Text('Pago de ${formatClp(amount)} a ${widget.store.name} registrado.')));
+      messenger.showSnackBar(SnackBar(content: Text('Pago de ${formatClp(amount)} a ${widget.storeName} registrado.')));
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(friendlyError(e, fallback: 'No se pudo registrar el pago.'))));
       if (mounted) setState(() => _saving = false);
@@ -318,9 +327,9 @@ class _PayoutDialogState extends State<_PayoutDialog> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<BankAccount?>(
-      stream: Repository.instance.watchBankAccount(widget.store.id),
+      stream: Repository.instance.watchBankAccount(widget.storeId),
       builder: (context, bankSnap) => StreamBuilder<List<BagOrder>>(
-        stream: Repository.instance.watchUnpaidOrders(widget.store.id),
+        stream: Repository.instance.watchUnpaidOrders(widget.storeId),
         builder: (context, snap) {
           final orders = snap.data ?? const <BagOrder>[];
           final gross = orders.fold<int>(0, (s, o) => s + o.amount);
@@ -328,7 +337,7 @@ class _PayoutDialogState extends State<_PayoutDialog> {
           final loading = !snap.hasData || bankSnap.connectionState == ConnectionState.waiting;
           final bank = bankSnap.data;
           return AlertDialog(
-            title: Text('Liquidar a ${widget.store.name}'),
+            title: Text('Liquidar a ${widget.storeName}'),
             content: SizedBox(
               width: 440,
               child: loading
@@ -444,8 +453,8 @@ class _Notice extends StatelessWidget {
 int _noShows(List<BagOrder> orders) => orders.where((o) => o.status == OrderStatus.noShow).length;
 
 /// Resumen de lo que hay que pagar a todos los locales, con acceso a "Liquidar todos".
-class _PayAllBar extends StatelessWidget {
-  const _PayAllBar();
+class PayAllBar extends StatelessWidget {
+  const PayAllBar({super.key});
 
   @override
   Widget build(BuildContext context) {

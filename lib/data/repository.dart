@@ -101,6 +101,14 @@ class Repository {
   Future<void> saveBankAccount(String storeId, BankAccount account) =>
       _bankDoc(storeId).set({...account.toMap(), 'updatedAt': FieldValue.serverTimestamp()});
 
+  /// Admin: últimas liquidaciones de todos los locales (historial con planilla).
+  Stream<List<Payout>> watchAllPayouts({int limit = 50}) => _db
+      .collection('payouts')
+      .orderBy('createdAt', descending: true)
+      .limit(limit)
+      .snapshots()
+      .map((s) => s.docs.map(Payout.fromDoc).toList());
+
   Stream<List<Payout>> watchPayouts(String storeId) => _db
       .collection('payouts')
       .where('storeId', isEqualTo: storeId)
@@ -241,6 +249,9 @@ class Repository {
     final res = await functions.httpsCallable('sendTestEmail').call<Map<String, dynamic>>({'kind': kind});
     return res.data['to'] as String;
   }
+
+  /// Admin: borra a un inscrito de la lista de espera (derecho a eliminar sus datos).
+  Future<void> deleteWaitlistEntry(String id) => _db.collection('waitlist').doc(id).delete();
 
   Stream<List<WaitlistEntry>> watchWaitlist() => _db
       .collection('waitlist')
