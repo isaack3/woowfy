@@ -26,11 +26,34 @@ const DEFAULTS: EmailSettings = {
   enabled: false, orderEmails: true, fromName: "Woowfy", fromEmail: "hola@woowfy.com", replyTo: "hola@passva.com",
 };
 
+/** Único dominio verificado en Resend: la clave solo puede enviar desde aquí. */
+const SENDER_DOMAIN = "woowfy.com";
+
 async function emailSettings(): Promise<EmailSettings> {
   const snap = await getFirestore().doc("config/email").get();
   const s = { ...DEFAULTS, ...(snap.data() as Partial<EmailSettings> | undefined) };
+  // Un remitente de otro dominio haría fallar todos los envíos: se usa el predeterminado (el admin ya lo valida).
+  const fromEmail = s.fromEmail?.toLowerCase().endsWith(`@${SENDER_DOMAIN}`) ? s.fromEmail : DEFAULTS.fromEmail;
   // Las respuestas siempre llegan a un buzón real (woowfy.com solo envía, no recibe).
-  return { ...s, replyTo: s.replyTo || DEFAULTS.replyTo };
+  return { ...s, fromEmail, replyTo: s.replyTo || DEFAULTS.replyTo };
+}
+
+/** woowfy.com ya salió de "en construcción" (config/site, lo cambia el admin con "Lanzar"). */
+async function siteLaunched(): Promise<boolean> {
+  return (await siteLaunch()).launched;
+}
+
+/** Estado del lanzamiento y desde cuándo (launchedAt lo escribe la app al presionar "Lanzar"). */
+async function siteLaunch(): Promise<{ launched: boolean; launchedAt?: Date }> {
+  const d = (await getFirestore().doc("config/site").get()).data();
+  return { launched: d?.launched === true, launchedAt: toDate(d?.launchedAt) };
+}
+
+/** Error de Resend con su código HTTP (429 = límite de envíos alcanzado). */
+class ResendError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
 }
 
 async function sendEmail(apiKey: string, s: EmailSettings, to: string, subject: string, html: string): Promise<string> {
@@ -46,7 +69,7 @@ async function sendEmail(apiKey: string, s: EmailSettings, to: string, subject: 
     }),
   });
   const body = (await res.json().catch(() => ({}))) as { id?: string; message?: string };
-  if (!res.ok) throw new Error(body.message ?? `Resend respondió ${res.status}`);
+  if (!res.ok) throw new ResendError(body.message ?? `Resend respondió ${res.status}`, res.status);
   return body.id ?? "";
 }
 
@@ -93,15 +116,20 @@ const summary = (rows: string) =>
 
 const ORDER_FOOTER = "Recibes este correo por una compra en Woowfy. ¿Dudas o problemas con tu pedido? Responde a este correo.";
 
-/** Correo de bienvenida a la lista de espera. */
-function welcomeEmail(entry: { name?: string; type?: string; businessName?: string | null }) {
+/** Correo de bienvenida a la lista de espera. Ya lanzada, la lista es para comunas que aún no tienen locales. */
+function welcomeEmail(entry: { name?: string; type?: string; businessName?: string | null }, launched = false) {
   const firstName = escape((entry.name ?? "").trim().split(/\s+/)[0] || "");
   const isStore = entry.type === "comercio";
   const body = isStore
     ? `Gracias por querer sumar <strong>${escape(entry.businessName ?? "tu local")}</strong> a Woowfy. ` +
-      "Te contactaremos pronto para conocerlo y dejarlo listo para el lanzamiento."
-    : "Ya estás en la lista de espera de Woowfy. Te avisaremos apenas lancemos para que rescates " +
-      "tus primeras bolsas sorpresa a mitad de precio.";
+      (launched
+        ? "Te contactaremos pronto para conocerlo y dejarlo publicando sus primeras bolsas."
+        : "Te contactaremos pronto para conocerlo y dejarlo listo para el lanzamiento.")
+    : launched
+      ? "Ya estás en la lista de Woowfy. Te avisaremos cuando haya locales en tu comuna; mientras tanto, " +
+        "puedes ver las bolsas disponibles en otras comunas desde la app."
+      : "Ya estás en la lista de espera de Woowfy. Te avisaremos apenas lancemos para que rescates " +
+        "tus primeras bolsas sorpresa a mitad de precio.";
   const subject = isStore ? "Recibimos los datos de tu local 🥐" : `${firstName ? firstName + ", ya" : "Ya"} estás en la lista de Woowfy 🌱`;
   const html = layout({
     title: firstName ? `¡Hola, ${firstName}!` : "¡Hola!",
@@ -109,6 +137,35 @@ function welcomeEmail(entry: { name?: string; type?: string; businessName?: stri
     cta: { label: "Visitar woowfy.com", url: "https://woowfy.com" },
     footer: "Recibes este correo porque te inscribiste en woowfy.com. Si no fuiste tú, ignóralo. " +
       "Para que borremos tus datos, responde a este correo.",
+  });
+  return { subject, html };
+}
+
+/** Aviso de lanzamiento a la lista de espera: lo que la landing prometió ("Avísame cuando lancen"). */
+function launchEmail(entry: { name?: string; type?: string; businessName?: string | null; comuna?: string }) {
+  const firstName = escape((entry.name ?? "").trim().split(/\s+/)[0] || "");
+  const isStore = entry.type === "comercio";
+  const subject = isStore
+    ? "Woowfy ya abrió: suma tu local 🥐"
+    : `${firstName ? firstName + ", ¡Woowfy" : "¡Woowfy"} ya abrió! 🌱`;
+  const body = isStore
+    ? p(`Te inscribiste para sumar <strong>${escape(entry.businessName ?? "tu local")}</strong> a Woowfy, y ya ` +
+        "estamos funcionando. Crea tu cuenta, envía la solicitud de tu local y, una vez aprobado, publica tus primeras " +
+        "bolsas sorpresa con lo que no alcances a vender en el día.") +
+      p("Tú decides cuántas bolsas, a qué precio y en qué horario se retiran. Te transferimos lo vendido cada semana.", 24)
+    : p("Te prometimos avisarte y aquí estamos: ya puedes rescatar bolsas sorpresa de panaderías, cafés y " +
+        "restaurantes a mitad de precio, y ayudar a que esa comida no se bote.") +
+      p("Reserva desde la app, paga en línea y retira en el local con tu código. Si en tu comuna todavía no hay " +
+        "locales, vuelve pronto: estamos sumando más.", 24);
+  const html = layout({
+    title: firstName ? `¡Hola, ${firstName}!` : "¡Hola!",
+    body,
+    cta: isStore
+      ? { label: "Sumar mi local", url: `${APP_URL}/merchant` }
+      : { label: "Ver bolsas disponibles", url: APP_URL },
+    footer: "Recibes este correo porque te inscribiste en la lista de espera de woowfy.com para que te avisáramos del " +
+      "lanzamiento. Es un aviso único: no te enviaremos publicidad sin tu permiso. Para que borremos tus datos, " +
+      "responde a este correo.",
   });
   return { subject, html };
 }
@@ -210,13 +267,25 @@ export const onWaitlistCreated = onDocumentCreated(
     const snap = event.data;
     if (!snap) return;
     const entry = snap.data();
+    // Quien se inscribe ya lanzado no espera el aviso de lanzamiento (la lista queda para comunas sin locales).
+    // Se compara con la hora del lanzamiento, no con el estado actual: el trigger puede correr con atraso.
+    const site = await siteLaunch();
+    const createdAt = toDate(entry.createdAt);
+    const launched = site.launched && (!site.launchedAt || !createdAt || createdAt >= site.launchedAt);
+    if (launched) {
+      // Sin pisar un estado que ya exista (p. ej. si el aviso ya se envió).
+      await getFirestore().runTransaction(async (tx) => {
+        if ((await tx.get(snap.ref)).data()?.launchEmail) return;
+        tx.update(snap.ref, { launchEmail: { status: "skipped", reason: "after_launch", at: FieldValue.serverTimestamp() } });
+      });
+    }
     const s = await emailSettings();
     if (!s.enabled) {
       await snap.ref.update({ welcomeEmail: { status: "skipped", reason: "disabled", at: FieldValue.serverTimestamp() } });
       return;
     }
     try {
-      const { subject, html } = welcomeEmail(entry);
+      const { subject, html } = welcomeEmail(entry, launched);
       const id = await sendEmail(RESEND_API_KEY.value(), s, entry.email, subject, html);
       await snap.ref.update({ welcomeEmail: { status: "sent", id, at: FieldValue.serverTimestamp() } });
     } catch (e) {
@@ -294,11 +363,15 @@ function sampleOrder(): OrderMail {
   };
 }
 
-/** El correo de ejemplo de cada tipo (welcome | purchase | refund), con datos inventados. */
+/** El correo de ejemplo de cada tipo (welcome | purchase | refund | launch | launch_store), con datos inventados. */
 function sampleEmail(kind: string, name = "") {
-  return kind === "purchase" ? purchaseEmail(sampleOrder())
-    : kind === "refund" ? refundEmail(sampleOrder())
-      : welcomeEmail({ name, type: "cliente" });
+  switch (kind) {
+    case "purchase": return purchaseEmail(sampleOrder());
+    case "refund": return refundEmail(sampleOrder());
+    case "launch": return launchEmail({ name, type: "cliente" });
+    case "launch_store": return launchEmail({ name, type: "comercio", businessName: "Panadería La Espiga" });
+    default: return welcomeEmail({ name, type: "cliente" });
+  }
 }
 
 async function requireAdmin(uid: string | undefined) {
@@ -329,5 +402,75 @@ export const sendTestEmail = onCall({ secrets: [RESEND_API_KEY] }, async (req) =
   }
 });
 
+/** Resend permite unas 2 solicitudes por segundo: se espera entre un envío y otro. */
+const LAUNCH_SEND_GAP_MS = 600;
+/** Margen para devolver la respuesta antes del tiempo máximo de la función (540 s). */
+const LAUNCH_TIME_BUDGET_MS = 480_000;
+
+/**
+ * Admin → "Lanzar" → "Enviar aviso": manda el correo de lanzamiento a quienes se inscribieron antes de lanzar.
+ * Cada inscrito se "reserva" en una transacción (waitlist/{id}.launchEmail), así un doble clic o un reintento no lo
+ * manda dos veces. Si Resend corta por límite (429, p. ej. el tope diario del plan gratis) o se acaba el tiempo, se
+ * detiene y devuelve cuántos faltan: se vuelve a presionar más tarde y sigue con los pendientes.
+ */
+export const sendLaunchEmails = onCall({ secrets: [RESEND_API_KEY], timeoutSeconds: 540 }, async (req) => {
+  await requireAdmin(req.auth?.uid);
+  if (!(await siteLaunched())) {
+    throw new HttpsError("failed-precondition", "Primero lanza woowfy.com: el correo invita a entrar a la app.");
+  }
+  const s = await emailSettings();
+  if (!s.enabled) throw new HttpsError("failed-precondition", "Activa los correos automáticos en Admin → Correo.");
+
+  const db = getFirestore();
+  const started = Date.now();
+  const all = await db.collection("waitlist").get();
+  const pending = all.docs.filter((d) => {
+    const status = d.data().launchEmail?.status;
+    return status === undefined || status === "error";
+  });
+  let sent = 0;
+  let failed = 0;
+  let stoppedBy: "limit" | "time" | null = null;
+
+  for (const doc of pending) {
+    if (Date.now() - started > LAUNCH_TIME_BUDGET_MS) {
+      stoppedBy = "time";
+      break;
+    }
+    const claimed = await db.runTransaction(async (tx) => {
+      const status = (await tx.get(doc.ref)).data()?.launchEmail?.status;
+      if (status !== undefined && status !== "error") return false;
+      tx.update(doc.ref, { launchEmail: { status: "sending", at: FieldValue.serverTimestamp() } });
+      return true;
+    });
+    if (!claimed) continue;
+    const entry = doc.data();
+    try {
+      const { subject, html } = launchEmail(entry);
+      const id = await sendEmail(RESEND_API_KEY.value(), s, entry.email, subject, html);
+      await doc.ref.update({ launchEmail: { status: "sent", id, at: FieldValue.serverTimestamp() } });
+      sent++;
+    } catch (e) {
+      const limited = e instanceof ResendError && e.status === 429;
+      // Con límite alcanzado no es un error del inscrito: se deja pendiente para el próximo intento.
+      await doc.ref.update({
+        launchEmail: limited
+          ? FieldValue.delete()
+          : { status: "error", error: String((e as Error).message).slice(0, 300), at: FieldValue.serverTimestamp() },
+      });
+      if (limited) {
+        stoppedBy = "limit";
+        break;
+      }
+      failed++;
+      logger.error("No se pudo enviar el aviso de lanzamiento", { id: doc.id, error: String(e) });
+    }
+    await new Promise((r) => setTimeout(r, LAUNCH_SEND_GAP_MS));
+  }
+  const remaining = pending.length - sent - failed;
+  logger.info("Aviso de lanzamiento", { sent, failed, remaining, stoppedBy });
+  return { sent, failed, remaining, stoppedBy };
+});
+
 /** Solo para previsualizar las plantillas en desarrollo (tool/preview-emails.mjs). */
-export const _templates = { welcomeEmail, purchaseEmail, refundEmail, sampleOrder };
+export const _templates = { welcomeEmail, purchaseEmail, refundEmail, launchEmail, sampleOrder };

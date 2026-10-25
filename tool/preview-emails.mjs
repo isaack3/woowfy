@@ -11,6 +11,8 @@ const mails = {
   compra: t.purchaseEmail(order),
   "reembolso-local": t.refundEmail(order),
   "reembolso-cliente": t.refundEmail({ ...order, cancelReason: "customer" }),
+  lanzamiento: t.launchEmail({ name: "Camila", type: "cliente" }),
+  "lanzamiento-local": t.launchEmail({ name: "Pedro", type: "comercio", businessName: "Panadería La Espiga" }),
 };
 for (const [name, { subject, html }] of Object.entries(mails)) {
   writeFileSync(new URL(`${name}.html`, out), html);

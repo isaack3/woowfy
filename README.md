@@ -151,7 +151,7 @@ Todo lo que Woowfy usa fuera del repositorio, dónde vive y para qué. Al agrega
 
 | Región | Funciones |
 |---|---|
-| **`southamerica-west1`** (Santiago), 22 | **Pedidos y pagos:** `createOrder`, `syncOrderPayment`, `cancelOrder`, `cancelBag`, `redeemOrder`, `confirmMockPayment` (solo con `mock`), `retryRefund`, `mercadoPagoWebhook` (HTTP) · **Liquidaciones:** `createPayout`, `createAllPayouts`, `voidPayout` · **Calificaciones:** `rateOrder` · **Correos:** `onOrderUpdated`, `onWaitlistCreated`, `sendTestEmail`, `previewEmail` · **Locales y bolsas:** `onStoreCreated`, `onStoreUpdated`, `onBagCreated`, `onBagTemplateWritten` · **Landing:** `joinWaitlist` (HTTP, `/api/waitlist`), `trackEvent` (HTTP, analítica anónima) |
+| **`southamerica-west1`** (Santiago), 23 | **Pedidos y pagos:** `createOrder`, `syncOrderPayment`, `cancelOrder`, `cancelBag`, `redeemOrder`, `confirmMockPayment` (solo con `mock`), `retryRefund`, `mercadoPagoWebhook` (HTTP) · **Liquidaciones:** `createPayout`, `createAllPayouts`, `voidPayout` · **Calificaciones:** `rateOrder` · **Correos:** `onOrderUpdated`, `onWaitlistCreated`, `sendTestEmail`, `previewEmail`, `sendLaunchEmails` · **Locales y bolsas:** `onStoreCreated`, `onStoreUpdated`, `onBagCreated`, `onBagTemplateWritten` · **Landing:** `joinWaitlist` (HTTP, `/api/waitlist`), `trackEvent` (HTTP, analítica anónima) |
 | **`southamerica-east1`** (São Paulo), 4 programadas | `expirePendingOrders` (cada 5 min) · `markNoShows` (cada 30 min) · `sendPickupReminders` (cada 15 min) · `publishRecurringBags` (todos los días, 05:00 hora de Chile) |
 
 Todas usan 256 MB y como máximo 10 instancias (`setGlobalOptions` en `functions/src/index.ts`).
@@ -429,9 +429,11 @@ Plantillas en `functions/src/email.ts` (HTML con la paleta de la marca):
 | Bienvenida | alguien se inscribe en la lista de espera | `onWaitlistCreated` |
 | Confirmación de compra (código de retiro, horario, plazo para cancelar) | el pedido pasa a pagado | `onOrderUpdated` |
 | Aviso de reembolso (monto y motivo) | Mercado Pago confirma el reembolso | `onOrderUpdated` |
+| Aviso de lanzamiento (clientes y locales) | el admin presiona "Lanzar" y confirma "Enviar" (también desde Interesados) | `sendLaunchEmails` |
 
 - **Admin → Correo:** interruptor general, "Compra y reembolso", remitente (`@woowfy.com`, dominio verificado
-  en Resend) y "responder a". **Ver plantillas (sin enviar)** muestra cada correo con datos de ejemplo;
+  en Resend: el formulario no acepta otro dominio y, si llegara uno, el servidor usa `hola@woowfy.com`) y
+  "responder a". **Ver plantillas (sin enviar)** muestra cada correo con datos de ejemplo;
   **Enviar prueba a mi correo** manda el que elijas al admin conectado.
 - Vista previa local: `npm --prefix functions run build` y `node tool/preview-emails.mjs` (→ `build/emails/`).
 - Cada correo de pedido se envía una sola vez: queda registrado en el pedido (`sent` / `skipped` / `error`).

@@ -8,6 +8,9 @@ import 'email_preview.dart';
 
 final _emailRe = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$');
 
+/// Único dominio verificado en Resend: la clave de envío solo acepta remitentes de aquí (igual que en email.ts).
+const senderDomain = 'woowfy.com';
+
 /// Admin → Correo: remitente de los correos automáticos (bienvenida a la lista de espera).
 class EmailSettingsTab extends StatelessWidget {
   const EmailSettingsTab({super.key});
@@ -107,7 +110,8 @@ class _FormState extends State<_Form> {
         children: [
           Text('Correos automáticos', style: t.titleLarge),
           const SizedBox(height: 4),
-          const Text('Bienvenida a la lista de espera, confirmación de compra con el código de retiro y aviso de reembolso.'),
+          const Text('Bienvenida a la lista de espera, confirmación de compra con el código de retiro, aviso de reembolso '
+              'y aviso de lanzamiento (se envía desde "Lanzar").'),
           const SizedBox(height: 16),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
@@ -136,15 +140,16 @@ class _FormState extends State<_Form> {
             decoration: const InputDecoration(
               labelText: 'Correo del remitente',
               hintText: 'hola@woowfy.com',
-              helperText: 'Debe ser de un dominio verificado en Resend (woowfy.com). '
-                  'No puede ser @gmail.com: Gmail bloquea correos enviados en su nombre desde otros servidores.',
+              helperText: 'Debe terminar en @$senderDomain, el dominio verificado en Resend. Para recibir las '
+                  'respuestas en otro correo (como @passva.com o tu Gmail), usa "Responder a".',
               helperMaxLines: 3,
+              errorMaxLines: 3,
             ),
             validator: (v) {
               final err = email(v);
               if (err != null) return err;
-              if (v!.trim().toLowerCase().endsWith('@gmail.com')) {
-                return 'Usa una dirección @woowfy.com; tu Gmail va en "Responder a".';
+              if (!v!.trim().toLowerCase().endsWith('@$senderDomain')) {
+                return 'Usa una dirección @$senderDomain (por ejemplo hola@$senderDomain). La otra va en "Responder a".';
               }
               return null;
             },
@@ -194,6 +199,8 @@ class _FormState extends State<_Form> {
                   PopupMenuItem(value: 'welcome', child: Text('Bienvenida a la lista de espera')),
                   PopupMenuItem(value: 'purchase', child: Text('Confirmación de compra')),
                   PopupMenuItem(value: 'refund', child: Text('Aviso de reembolso')),
+                  PopupMenuItem(value: 'launch', child: Text('Aviso de lanzamiento (clientes)')),
+                  PopupMenuItem(value: 'launch_store', child: Text('Aviso de lanzamiento (locales)')),
                 ],
                 child: IgnorePointer(
                   child: OutlinedButton.icon(
@@ -211,7 +218,7 @@ class _FormState extends State<_Form> {
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
-              onPressed: () => showDialog<void>(context: context, builder: (_) => const _TemplatesDialog()),
+              onPressed: () => showDialog<void>(context: context, builder: (_) => const EmailTemplatesDialog()),
               icon: const Icon(Icons.visibility_outlined, size: 18),
               label: const Text('Ver plantillas (sin enviar)'),
             ),
@@ -223,16 +230,25 @@ class _FormState extends State<_Form> {
 }
 
 /// Muestra cómo se ve cada correo automático, con datos de ejemplo y sin enviar nada.
-class _TemplatesDialog extends StatefulWidget {
-  const _TemplatesDialog();
+class EmailTemplatesDialog extends StatefulWidget {
+  const EmailTemplatesDialog({super.key, this.initialKind = 'welcome'});
+
+  /// welcome | purchase | refund | launch | launch_store
+  final String initialKind;
 
   @override
-  State<_TemplatesDialog> createState() => _TemplatesDialogState();
+  State<EmailTemplatesDialog> createState() => _EmailTemplatesDialogState();
 }
 
-class _TemplatesDialogState extends State<_TemplatesDialog> {
-  static const _kinds = {'welcome': 'Bienvenida', 'purchase': 'Compra', 'refund': 'Reembolso'};
-  String _kind = 'welcome';
+class _EmailTemplatesDialogState extends State<EmailTemplatesDialog> {
+  static const _kinds = {
+    'welcome': 'Bienvenida',
+    'purchase': 'Compra',
+    'refund': 'Reembolso',
+    'launch': 'Lanzamiento',
+    'launch_store': 'Lanzamiento (locales)',
+  };
+  late String _kind = widget.initialKind;
   late Future<({String subject, String html})> _mail = Repository.instance.previewEmail(_kind);
 
   @override
@@ -253,13 +269,22 @@ class _TemplatesDialogState extends State<_TemplatesDialog> {
                 IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close), tooltip: 'Cerrar'),
               ]),
             ),
-            SegmentedButton<String>(
-              segments: [for (final e in _kinds.entries) ButtonSegment(value: e.key, label: Text(e.value))],
-              selected: {_kind},
-              onSelectionChanged: (v) => setState(() {
-                _kind = v.first;
-                _mail = Repository.instance.previewEmail(_kind);
-              }),
+            // Chips en vez de botones segmentados: con cinco plantillas así caben también en el celular.
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: [
+                for (final e in _kinds.entries)
+                  ChoiceChip(
+                    label: Text(e.value),
+                    selected: _kind == e.key,
+                    onSelected: (_) => setState(() {
+                      _kind = e.key;
+                      _mail = Repository.instance.previewEmail(_kind);
+                    }),
+                  ),
+              ],
             ),
             const SizedBox(height: 8),
             Expanded(

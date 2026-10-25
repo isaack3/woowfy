@@ -21,7 +21,7 @@ espera, landing honesta, admin con pestaña Pagos, liquidaciones que se pueden a
 Woowfy es un producto de **Passva SpA** (RUT 78.487.341-2), contacto `hola@passva.com`.
 
 **Para retomar, primero lo que depende de ti** (sección "Pendiente" más abajo): probar el escáner en iPhone,
-activar Resend (los correos ya están listos) y la revisión legal. **Mercado Pago ya cobra en producción** con la cuenta de
+la revisión legal (Resend ya envía correos desde el 25-10). **Mercado Pago ya cobra en producción** con la cuenta de
 Passva SpA (25-10): cada compra mueve dinero real. Con eso se puede lanzar (botón "Lanzar" arriba del admin).
 
 ---
@@ -160,7 +160,8 @@ y desplegada el 28-09; datos de producción migrados
 - [x] Analítica básica propia y anónima (sin cookies): contadores por día en `stats/` + pestaña Admin → Analítica
       con visitas, inscritos, cuentas nuevas y embudo visita → bolsa vista → reserva → pago → retiro
 - [x] Landing con modo lanzamiento: interruptor en Admin → Interesados (`config/site`), sin redesplegar
-- [ ] Correo de lanzamiento a la lista de espera (cuando Resend esté activo)
+- [x] Correo de lanzamiento a la lista de espera: al presionar "Lanzar" se ofrece enviarlo (una vez por inscrito,
+      con vista previa; sigue al día siguiente si se alcanza el tope diario de Resend). Función `sendLaunchEmails` (25-10)
 - [x] Guía para comercios en `woowfy.com/merchants` (calculadora, consejos, retiros, cancelaciones, pagos) y enlace
       desde el panel del local
 
@@ -286,10 +287,10 @@ Puntajes (heurísticas de Nielsen): Home 22/40 · flujo cliente 22/40 · comerci
 - [ ] Confirmar en tu navegador que al recargar `app.woowfy.com/merchant` sigues con sesión
 - [ ] 🔔 **Clave VAPID** para notificaciones push: consola Firebase → Configuración del proyecto → Cloud Messaging
       → Certificados push web → Generar. La clave pública va en `lib/core/push.dart` y se redespliega la app.
-- [ ] ✉️ **Activar correos:** cuenta Resend + verificar `woowfy.com` (DNS en Piensa Solutions) +
-      `firebase functions:secrets:set RESEND_API_KEY` + redeploy de las funciones de correo + activar en
-      Admin → Correo (hoy el secreto tiene un valor provisional)
-- [x] ~~Reenvío `hola@woowfy.com` con ImprovMX~~: ya no hace falta, el contacto es `hola@passva.com` (10-10). Queda opcional el TXT `_dmarc`
+- [x] ✉️ **Correos activos (25-10):** cuenta Resend (equipo passva), `woowfy.com` verificado en Piensa Solutions,
+      clave "Woowfy Key" (solo envío) en `RESEND_API_KEY`, funciones redesplegadas e interruptor encendido en
+      Admin → Correo. Prueba recibida en la bandeja de entrada desde `hola@woowfy.com`
+- [x] ~~Reenvío `hola@woowfy.com` con ImprovMX~~: ya no hace falta, el contacto es `hola@passva.com` (10-10). TXT `_dmarc` agregado (25-10)
 - [ ] 🗺️ Revisar el mapa en la app y poner la dirección real de tu local (hoy ubicado en el centro de El Monte)
 - [ ] ⚖️ Revisión legal de `/terms` y `/privacy` (ya con los datos de Passva SpA; valores confirmados el 25-10:
       2 reservas, 2 h, 15 min, 25%, pago semanal). Consultar también quién emite la boleta al cliente
@@ -297,7 +298,7 @@ Puntajes (heurísticas de Nielsen): Home 22/40 · flujo cliente 22/40 · comerci
 - [ ] ↪️ Redirección 301 `www.woowfy.com` → `woowfy.com` (consola → Hosting → sitio woowfy-app → editar dominio)
 - [x] `firebase functions:secrets:prune` (hecho el 10-10)
 - [ ] Personalizar la plantilla del correo "recuperar contraseña" (Authentication → Plantillas)
-- [ ] Correo de lanzamiento a la lista de espera (exportar CSV desde Admin → Interesados)
+- [ ] Enviar el aviso de lanzamiento cuando lances (sale del mismo botón "Lanzar"; también en Admin → Interesados)
 - [ ] Pedir al diseñador un brand kit con el isotipo centrado (el v2 viene cortado)
 
 ### Resuelto en el camino

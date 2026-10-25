@@ -260,6 +260,8 @@ class Repository {
 
   Future<void> setSiteLaunched(bool launched) => _db.doc('config/site').set({
         'launched': launched,
+        // Quien se inscribe después de esta hora no recibe el aviso de lanzamiento (ver onWaitlistCreated).
+        if (launched) 'launchedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
@@ -278,6 +280,21 @@ class Repository {
   Future<String> sendTestEmail([String kind = 'welcome']) async {
     final res = await functions.httpsCallable('sendTestEmail').call<Map<String, dynamic>>({'kind': kind});
     return res.data['to'] as String;
+  }
+
+  /// Admin: envía el aviso de lanzamiento a los inscritos que aún no lo reciben (el servidor sigue con los pendientes
+  /// si se corta por el límite diario de Resend o por tiempo).
+  Future<({int sent, int failed, int remaining, String? stoppedBy})> sendLaunchEmails() async {
+    final res = await functions
+        .httpsCallable('sendLaunchEmails', options: HttpsCallableOptions(timeout: const Duration(minutes: 9)))
+        .call<Map<String, dynamic>>();
+    final d = res.data;
+    return (
+      sent: (d['sent'] as num).toInt(),
+      failed: (d['failed'] as num).toInt(),
+      remaining: (d['remaining'] as num).toInt(),
+      stoppedBy: d['stoppedBy'] as String?,
+    );
   }
 
   /// Admin: borra a un inscrito de la lista de espera (derecho a eliminar sus datos).

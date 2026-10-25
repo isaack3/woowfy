@@ -379,6 +379,7 @@ class WaitlistEntry {
     required this.email,
     this.name = '',
     this.emailStatus,
+    this.launchEmailStatus,
     required this.isMerchant,
     this.region,
     this.comuna,
@@ -391,11 +392,16 @@ class WaitlistEntry {
   final String name;
   /// Estado del correo de bienvenida: sent | error | skipped (null si aún no se procesa).
   final String? emailStatus;
+  /// Aviso de lanzamiento: sent | error | sending | skipped (se inscribió ya lanzado); null = pendiente.
+  final String? launchEmailStatus;
   final String? region;
   final bool isMerchant;
   final String? comuna;
   final String? businessName;
   final DateTime? createdAt;
+
+  /// Le falta el aviso de lanzamiento (nunca se envió o falló).
+  bool get awaitsLaunchEmail => launchEmailStatus == null || launchEmailStatus == 'error';
 
   factory WaitlistEntry.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final d = doc.data()!;
@@ -404,6 +410,7 @@ class WaitlistEntry {
       email: d['email'] as String? ?? '',
       name: d['name'] as String? ?? '',
       emailStatus: (d['welcomeEmail'] as Map<String, dynamic>?)?['status'] as String?,
+      launchEmailStatus: (d['launchEmail'] as Map<String, dynamic>?)?['status'] as String?,
       isMerchant: d['type'] == 'comercio',
       region: d['region'] as String?,
       comuna: d['comuna'] as String?,
