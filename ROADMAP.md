@@ -107,7 +107,7 @@ El QR contiene el mismo código de 6 caracteres que aparece debajo: el comercio 
 - [x] Tu impacto (bolsas rescatadas, ahorro, CO₂ evitado estimado)
 - [x] Compartir bolsa (menú nativo o copiar enlace)
 - [x] Instalar la app (PWA) desde Cuenta
-- [ ] **Activar push:** generar la clave VAPID en la consola y ponerla en `lib/core/push.dart`
+- [x] **Push activo (25-10):** clave VAPID en `lib/core/push.dart`. En iPhone requiere instalar la app (Agregar a inicio)
 
 ### Sprint 3 — confianza y operación ✅
 - [x] Calificar el retiro (1–5 estrellas y comentario), nota del local en tarjetas y detalle, opiniones
@@ -285,8 +285,8 @@ Puntajes (heurísticas de Nielsen): Home 22/40 · flujo cliente 22/40 · comerci
 - [ ] 💸 Probar la liquidación: cuenta bancaria en *Ventas y pagos* y Admin → Pagos → "Liquidar todos" (si fue de prueba, "Anular")
 - [ ] ✏️ Confirmar en la guía para comercios "pago semanal" y "aprobación en 1 día hábil" (y en los términos)
 - [ ] Confirmar en tu navegador que al recargar `app.woowfy.com/merchant` sigues con sesión
-- [ ] 🔔 **Clave VAPID** para notificaciones push: consola Firebase → Configuración del proyecto → Cloud Messaging
-      → Certificados push web → Generar. La clave pública va en `lib/core/push.dart` y se redespliega la app.
+- [x] 🔔 **Clave VAPID** para notificaciones push (25-10). Falta probar: Cuenta → Notificaciones → Activar, seguir un local
+      y publicar una bolsa desde ese local (debe llegar el aviso)
 - [x] ✉️ **Correos activos (25-10):** cuenta Resend (equipo passva), `woowfy.com` verificado en Piensa Solutions,
       clave "Woowfy Key" (solo envío) en `RESEND_API_KEY`, funciones redesplegadas e interruptor encendido en
       Admin → Correo. Prueba recibida en la bandeja de entrada desde `hola@woowfy.com`

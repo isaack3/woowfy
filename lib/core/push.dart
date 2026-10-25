@@ -6,7 +6,7 @@ import '../data/repository.dart';
 /// Clave pública web push (VAPID) de Firebase Cloud Messaging.
 /// Se genera en consola → Configuración del proyecto → Cloud Messaging → Certificados push web.
 /// Es pública (no es un secreto). Mientras esté vacía, las notificaciones se muestran como "próximamente".
-const webPushVapidKey = '';
+const webPushVapidKey = 'BCb1wgAd_gXcDK5AdMj_PWf75JbYY5cnNT98VU1UlmnaGS3m9DNo4nPgf9h9uVtH-ELBQMqnJB3skMUr59QkWgk';
 
 /// Para mostrar avisos en pantalla cuando llega una notificación con la app abierta.
 final scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();

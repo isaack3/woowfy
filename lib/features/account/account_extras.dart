@@ -120,12 +120,17 @@ class _AppSettingsCardState extends State<AppSettingsCard> {
           ListTile(
             leading: const Icon(Icons.notifications_active_outlined, color: WoowfyColors.green),
             title: const Text('Notificaciones'),
-            subtitle: Text(Push.configured
-                ? 'Cuando tus favoritos publiquen y antes de cada retiro'
-                : 'Muy pronto: avisos de favoritos y recordatorios de retiro'),
-            trailing: Push.configured
-                ? TextButton(onPressed: _busy ? null : _enablePush, child: Text(_busy ? 'Activando…' : 'Activar'))
-                : null,
+            subtitle: Text(!Push.configured
+                ? 'Muy pronto: avisos de favoritos y recordatorios de retiro'
+                // Safari en iPhone solo permite notificaciones a la app agregada a la pantalla de inicio (iOS 16.4+).
+                : Pwa.isIos && !Pwa.isInstalled
+                    ? 'En iPhone, primero instala la app (arriba) y actívalas desde ahí'
+                    : 'Cuando tus favoritos publiquen y antes de cada retiro'),
+            trailing: !Push.configured
+                ? null
+                : Pwa.isIos && !Pwa.isInstalled
+                    ? TextButton(onPressed: _install, child: const Text('Instalar'))
+                    : TextButton(onPressed: _busy ? null : _enablePush, child: Text(_busy ? 'Activando…' : 'Activar')),
           ),
       ]),
     );

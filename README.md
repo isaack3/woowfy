@@ -143,7 +143,7 @@ Todo lo que Woowfy usa fuera del repositorio, dónde vive y para qué. Al agrega
 | Cloud Storage | Santiago | Fotos de bolsas y logos (`uploads/{uid}/…`) | Bucket `woowfy-app.firebasestorage.app`; reglas en `storage.rules`; CORS en `storage-cors.json` |
 | Firebase Authentication | Global | Ingreso con correo y con Google | `authDomain` = `app.woowfy.com`; cliente OAuth en Google Auth Platform |
 | Firebase Hosting | Global (CDN) | Sitio `woowfy-app` → `woowfy.com` (landing) · sitio `woowfy-app-web` → `app.woowfy.com` (app) | Guarda las últimas 5 versiones de cada sitio |
-| Cloud Messaging (FCM) | Global | Notificaciones push web | Inactivo hasta poner la clave VAPID en `lib/core/push.dart` |
+| Cloud Messaging (FCM) | Global | Notificaciones push web | Activo desde el 25-10-2026 (clave VAPID pública en `lib/core/push.dart`; par de claves en consola → Cloud Messaging → Certificados push web). En iPhone solo con la app instalada |
 | Secret Manager | Global | `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`, `RESEND_API_KEY` | Nunca en archivos del repositorio |
 | Cloud Build / Artifact Registry | Región de cada función | Compila y guarda las imágenes de las funciones al desplegar | Las imágenes se borran a 1 día |
 
