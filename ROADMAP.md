@@ -134,6 +134,17 @@ y desplegada el 28-09; datos de producción migrados
       usuario con sesión y sin ventana de antigüedad en la firma del webhook; bajo impacto)
 - [x] A11 · Arrepentimiento: cancelar con reembolso hasta 15 min después de pagar (además de las 2 h antes del retiro)
 
+**Etapa A2 — Segunda revisión de la auditoría (25-10) ✅** · probada en emuladores (17 pruebas)
+- [x] #11 Pago que no calza con el pedido: se devuelve solo y queda anotado
+- [x] Admin → Pagos → **"Requiere atención"**: reembolsos fallidos (antes nadie los veía) con botón "Reintentar"
+- [x] #12 Límite de 2 reservas sin pagar también con compras en paralelo
+- [x] #14 Código de retiro: si no carga, muestra el guardado en el teléfono o "Reintentar"
+- [x] No-shows sin pisar un retiro recién validado · cuenta bancaria: se puede quitar y se validan todos los campos
+      · el local ya no puede mover su ubicación en el mapa
+- [ ] #10 Correr `node tool/check-legacy-fields.mjs` (solo lectura) para ver si quedan datos antiguos expuestos
+- [ ] #13 Decidir si el arrepentimiento de 15 min aplica cuando el retiro ya empezó
+- [ ] (Opcional) Activar TTL en `pickupCodes.expireAt` (consola → Firestore → TTL)
+
 **Etapa B — Operación de pagos ✅**
 - [x] Red de seguridad de pagos (el pedido se concilia con Mercado Pago si el aviso no llega)
 - [x] Comisión visible siempre (25%): admin → Ventas, ventas del local, al publicar una bolsa y en el detalle para clientes

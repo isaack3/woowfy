@@ -14,7 +14,7 @@ async function hasBankAccount(storeId: string): Promise<boolean> {
   return bank.exists && Boolean(bank.data()?.accountNumber);
 }
 
-async function requireAdmin(uid: string | undefined): Promise<string> {
+export async function requireAdmin(uid: string | undefined): Promise<string> {
   if (!uid) throw new HttpsError("unauthenticated", "Debes iniciar sesión.");
   const me = (await getFirestore().collection("users").doc(uid).get()).data();
   if (me?.role !== "admin") throw new HttpsError("permission-denied", "Solo administradores.");

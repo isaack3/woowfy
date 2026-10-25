@@ -5,6 +5,7 @@ import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { pushToUser } from "./notifications.js";
 import { mercadoPago, PAYMENT_SECRETS, paymentProvider, validMercadoPagoSignature } from "./payments.js";
+import { requireAdmin } from "./payouts.js";
 
 /** Comisión de Woowfy sobre cada bolsa vendida. Ajustar según validación con comercios. */
 const PLATFORM_FEE_RATE = 0.25;
@@ -45,15 +46,19 @@ export const createOrder = onCall({ secrets: PAYMENT_SECRETS }, async (req) => {
   const orderRef = db.collection("orders").doc();
   const bagRef = db.collection("bags").doc(bagId);
 
-  // Evita que una cuenta acapare bolsas con reservas que no paga.
-  const unpaid = await db.collection("orders")
-    .where("userUid", "==", uid).where("status", "==", "pending_payment").limit(MAX_PENDING_ORDERS).get();
-  if (unpaid.size >= MAX_PENDING_ORDERS) {
-    throw new HttpsError("resource-exhausted",
-      `Tienes ${MAX_PENDING_ORDERS} reservas sin pagar. Págalas o cancélalas antes de reservar otra.`);
-  }
+  // orderLocks/{uid} (solo servidor) hace que dos reservas simultáneas de la misma persona choquen: una se reintenta
+  // y ya ve la reserva de la otra. Sin esto, varias llamadas en paralelo se saltan el límite.
+  const lockRef = db.collection("orderLocks").doc(uid);
+  const unpaidQuery = db.collection("orders")
+    .where("userUid", "==", uid).where("status", "==", "pending_payment").limit(MAX_PENDING_ORDERS);
 
   const order = await db.runTransaction(async (tx) => {
+    await tx.get(lockRef);
+    // Evita que una cuenta acapare bolsas con reservas que no paga.
+    if ((await tx.get(unpaidQuery)).size >= MAX_PENDING_ORDERS) {
+      throw new HttpsError("resource-exhausted",
+        `Tienes ${MAX_PENDING_ORDERS} reservas sin pagar. Págalas o cancélalas antes de reservar otra.`);
+    }
     const snap = await tx.get(bagRef);
     const bag = snap.data();
     const now = Timestamp.now();
@@ -100,10 +105,15 @@ export const createOrder = onCall({ secrets: PAYMENT_SECRETS }, async (req) => {
       expiresAt: Timestamp.fromMillis(now.toMillis() + PAYMENT_TIMEOUT_MINUTES * 60_000),
       createdAt: FieldValue.serverTimestamp(),
     };
+    tx.set(lockRef, { at: now });
     tx.update(bagRef, { quantityAvailable: FieldValue.increment(-1) });
     tx.set(orderRef, data);
     tx.set(orderRef.collection("private").doc("pickup"), { code, userUid: uid });
-    tx.set(codeRef, { orderId: orderRef.id, storeId: bag.storeId, pickupEnd: bag.pickupEnd });
+    // expireAt: para la política TTL de Firestore, que borra los códigos ya vencidos (si está activada).
+    tx.set(codeRef, {
+      orderId: orderRef.id, storeId: bag.storeId, pickupEnd: bag.pickupEnd,
+      expireAt: Timestamp.fromMillis(bag.pickupEnd.toMillis() + REDEEM_GRACE_MINUTES * 60_000),
+    });
     return data;
   });
 
@@ -148,8 +158,12 @@ export async function markOrderPaid(orderId: string, externalPaymentId: string):
 async function applyApprovedPayment(orderId: string, paymentId: string, amount: number): Promise<"paid" | "late" | "noop"> {
   // Misma verificación para el webhook y la conciliación: el pago debe cubrir el monto del pedido.
   const order = (await getFirestore().collection("orders").doc(orderId).get()).data();
-  if (!order || Number(amount) < Number(order.amount)) {
-    logger.error("Pago aprobado que no calza con el pedido", { orderId, paymentId, amount });
+  if (!order) {
+    logger.error("Pago aprobado de un pedido que no existe", { orderId, paymentId, amount });
+    return "noop";
+  }
+  if (Number(amount) < Number(order.amount)) {
+    await refundMismatchedPayment(orderId, order, paymentId, Number(amount));
     return "noop";
   }
   const result = await markOrderPaid(orderId, paymentId);
@@ -198,6 +212,41 @@ async function refundOrder(orderId: string): Promise<void> {
     await ref.update({ refund: { status: "error", error: String((e as Error).message).slice(0, 300), amount: order.amount } });
   }
 }
+
+/**
+ * Un pago aprobado por menos que el pedido no lo paga: se devuelve ese pago y queda anotado en el pedido
+ * (`paymentIssue`) para que el admin lo vea en Pagos → "Requiere atención". Idempotente ante avisos repetidos.
+ */
+async function refundMismatchedPayment(orderId: string, order: FirebaseFirestore.DocumentData, paymentId: string, amount: number) {
+  if (order.paymentIssue?.paymentId === paymentId && order.paymentIssue?.status !== "error") return;
+  logger.error("Pago aprobado con monto menor al del pedido: se reembolsa", { orderId, paymentId, amount, expected: order.amount });
+  const ref = getFirestore().collection("orders").doc(orderId);
+  const issue = { paymentId, amount, expected: order.amount, at: FieldValue.serverTimestamp() };
+  try {
+    const refundId = await paymentProvider().refund(paymentId, orderId);
+    await ref.update({ paymentIssue: { ...issue, status: "refunded", refundId } });
+  } catch (e) {
+    await ref.update({ paymentIssue: { ...issue, status: "error", error: String((e as Error).message).slice(0, 300) } });
+  }
+}
+
+/** Admin → Pagos → "Requiere atención": reintenta un reembolso que falló (del pedido o de un pago que no calzaba). */
+export const retryRefund = onCall({ secrets: PAYMENT_SECRETS }, async (req) => {
+  await requireAdmin(req.auth?.uid);
+  const orderId = String(req.data?.orderId ?? "");
+  const ref = getFirestore().collection("orders").doc(orderId);
+  const order = orderId ? (await ref.get()).data() : undefined;
+  if (!order) throw new HttpsError("not-found", "Pedido no encontrado.");
+  if (order.paymentIssue?.status === "error") {
+    await refundMismatchedPayment(orderId, order, order.paymentIssue.paymentId, order.paymentIssue.amount);
+  } else if (order.refund?.status === "error") {
+    await refundOrder(orderId);
+  } else {
+    throw new HttpsError("failed-precondition", "Este pedido no tiene un reembolso pendiente.");
+  }
+  const fresh = (await ref.get()).data();
+  return { refund: fresh?.refund?.status ?? null, paymentIssue: fresh?.paymentIssue?.status ?? null };
+});
 
 /** Cancela una orden pendiente y devuelve la unidad al stock de la bolsa. */
 export async function cancelPendingOrder(orderId: string, reason: string): Promise<void> {
@@ -411,10 +460,11 @@ export const markNoShows = onSchedule({
   const late = await db.collection("orders")
     .where("status", "==", "paid").where("pickupEnd", "<", cutoff).limit(450).get();
   if (late.empty) return;
-  const batch = db.batch();
-  late.docs.forEach((d) => batch.update(d.ref, { status: "no_show", noShowAt: FieldValue.serverTimestamp() }));
-  await batch.commit();
-  logger.info("Pedidos no retirados", { count: late.size });
+  // Precondición por pedido: si cambió desde la consulta (p. ej. el local lo validó justo ahora), no se pisa.
+  const results = await Promise.allSettled(late.docs.map((d) =>
+    d.ref.update({ status: "no_show", noShowAt: FieldValue.serverTimestamp() }, { lastUpdateTime: d.updateTime })));
+  const skipped = results.filter((r) => r.status === "rejected").length;
+  logger.info("Pedidos no retirados", { count: late.size - skipped, skipped });
 });
 
 /**

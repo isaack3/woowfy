@@ -646,6 +646,7 @@ class _BankDialogState extends State<_BankDialog> {
               TextFormField(
                 controller: _bank,
                 decoration: const InputDecoration(labelText: 'Banco', hintText: 'Banco Estado, Santander…'),
+                maxLength: 60,
                 validator: _required,
               ),
               const SizedBox(height: 8),

@@ -231,6 +231,10 @@ class BagOrder {
     this.cancelReason,
     this.storeMessage,
     this.refundStatus,
+    this.refundError,
+    this.paymentIssueStatus,
+    this.paymentIssueAmount,
+    this.paymentIssueError,
     this.rating,
     this.payoutId,
     this.createdAt,
@@ -255,6 +259,15 @@ class BagOrder {
   final String? storeMessage;
   /// pending | done | error (si hubo reembolso).
   final String? refundStatus;
+  /// Por qué falló el reembolso (si [refundStatus] es error).
+  final String? refundError;
+  /// Pago aprobado por menos que el pedido, que el servidor devuelve: refunded | error.
+  final String? paymentIssueStatus;
+  final int? paymentIssueAmount;
+  final String? paymentIssueError;
+
+  /// Hay dinero de un cliente que no se pudo devolver: lo debe revisar el admin.
+  bool get needsAttention => refundStatus == 'error' || paymentIssueStatus == 'error';
   /// Calificación que dio el cliente (1–5), si ya calificó.
   final int? rating;
   /// Liquidación en la que se le pagó este pedido al comercio.
@@ -297,6 +310,10 @@ class BagOrder {
       cancelReason: d['cancelReason'] as String?,
       storeMessage: d['storeMessage'] as String?,
       refundStatus: (d['refund'] as Map<String, dynamic>?)?['status'] as String?,
+      refundError: (d['refund'] as Map<String, dynamic>?)?['error'] as String?,
+      paymentIssueStatus: (d['paymentIssue'] as Map<String, dynamic>?)?['status'] as String?,
+      paymentIssueAmount: ((d['paymentIssue'] as Map<String, dynamic>?)?['amount'] as num?)?.toInt(),
+      paymentIssueError: (d['paymentIssue'] as Map<String, dynamic>?)?['error'] as String?,
       rating: (d['rating'] as num?)?.toInt(),
       payoutId: d['payoutId'] as String?,
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),

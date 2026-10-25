@@ -55,6 +55,8 @@ service cloud.firestore {
         && resource.data.ownerUid == request.auth.uid
         && request.resource.data.ownerUid == resource.data.ownerUid
         && !touchesRating(resource.data, request.resource.data)
+        // La ubicación la calcula el servidor desde la dirección (onStoreUpdated) y la revisión la hace el admin.
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['lat', 'lng', 'reviewedAt'])
         && (request.resource.data.status == resource.data.status
           || (resource.data.status == 'rejected' && request.resource.data.status == 'pending')));
     }
@@ -65,10 +67,18 @@ service cloud.firestore {
         return signedIn() && get(/databases/$(database)/documents/stores/$(storeId)).data.ownerUid == request.auth.uid;
       }
       allow read: if ownsStore() || isAdmin();
-      allow write: if (ownsStore() || isAdmin()) && doc == 'bank'
-        && request.resource.data.keys().hasOnly(['holder', 'rut', 'bank', 'accountType', 'accountNumber', 'email', 'updatedAt'])
-        && request.resource.data.holder is string && request.resource.data.holder.size() <= 100
-        && request.resource.data.accountNumber is string && request.resource.data.accountNumber.size() <= 30;
+      function validBank(d) {
+        return d.keys().hasOnly(['holder', 'rut', 'bank', 'accountType', 'accountNumber', 'email', 'updatedAt'])
+          && d.holder is string && d.holder.size() <= 100
+          && d.rut is string && d.rut.size() <= 12
+          && d.bank is string && d.bank.size() <= 60
+          && d.accountType in ['corriente', 'vista', 'ahorro']
+          && d.accountNumber is string && d.accountNumber.size() <= 30
+          && (!('email' in d) || (d.email is string && d.email.size() <= 254));
+      }
+      allow create, update: if (ownsStore() || isAdmin()) && doc == 'bank' && validBank(request.resource.data);
+      // El dueño puede quitar su cuenta (con `write`, borrar fallaba porque no hay request.resource).
+      allow delete: if (ownsStore() || isAdmin()) && doc == 'bank';
     }
 
     match /bags/{bagId} {

@@ -344,38 +344,67 @@ class _PickupCode extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
-    return StreamBuilder<String?>(
+    return Reloadable(builder: (context) => StreamBuilder<String?>(
       stream: Repository.instance.watchPickupCode(order.id),
       builder: (context, snap) {
         final code = snap.data ?? (order.pickupCode.isEmpty ? null : order.pickupCode);
-        if (code == null) {
-          return const SizedBox(height: 252, child: Center(child: CircularProgressIndicator()));
+        if (code == null && snap.hasError) {
+          // Sin señal o sin permiso: si el teléfono guardó el código antes, se muestra igual.
+          return FutureBuilder<_SavedReceipt?>(
+            future: _SavedReceipt.load(order.id),
+            builder: (context, saved) {
+              if (saved.connectionState != ConnectionState.done) return const _CodeSpinner();
+              final r = saved.data;
+              return r != null
+                  ? _CodeView(code: r.code)
+                  : ErrorRetry(title: 'No pudimos cargar tu código de retiro', error: snap.error);
+            },
+          );
         }
+        if (code == null) return const _CodeSpinner();
         _SavedReceipt.save(order, code);
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                // El QR contiene solo el código, así el comercio puede escanearlo o tipearlo.
-                child: QrImageView(data: code, size: 220),
-              ),
-            ),
-            const SizedBox(height: 16),
-            SelectableText(
-              code,
-              textAlign: TextAlign.center,
-              style: t.displaySmall?.copyWith(letterSpacing: 8, fontWeight: FontWeight.w700),
-            ),
-          ],
-        );
+        return _CodeView(code: code);
       },
+    ));
+  }
+}
+
+class _CodeSpinner extends StatelessWidget {
+  const _CodeSpinner();
+
+  @override
+  Widget build(BuildContext context) => const SizedBox(height: 252, child: Center(child: CircularProgressIndicator()));
+}
+
+class _CodeView extends StatelessWidget {
+  const _CodeView({required this.code});
+
+  final String code;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            // El QR contiene solo el código, así el comercio puede escanearlo o tipearlo.
+            child: QrImageView(data: code, size: 220),
+          ),
+        ),
+        const SizedBox(height: 16),
+        SelectableText(
+          code,
+          textAlign: TextAlign.center,
+          style: t.displaySmall?.copyWith(letterSpacing: 8, fontWeight: FontWeight.w700),
+        ),
+      ],
     );
   }
 }

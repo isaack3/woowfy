@@ -93,10 +93,11 @@ class MercadoPagoProvider implements PaymentProvider {
     return { url: (testMode && pref.sandbox_init_point) || pref.init_point, externalId: pref.id };
   }
 
-  async refund(paymentId: string, orderId: string): Promise<string> {
+  async refund(paymentId: string, _orderId: string): Promise<string> {
     const r = await this.api<{ id: number }>(`/v1/payments/${paymentId}/refunds`, {
       method: "POST",
-      idempotencyKey: `refund_${orderId}`,
+      // Por pago, no por pedido: un pedido puede tener un pago que no calza (ver applyApprovedPayment) además del suyo.
+      idempotencyKey: `refund_${paymentId}`,
       body: "{}",
     });
     return String(r.id);

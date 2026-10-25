@@ -171,3 +171,21 @@ Había cambios sin commitear de otra sesión (Sprint 4, etapa B: no-shows, "liqu
 2. #11 y #14.
 3. Revisar el trabajo en curso cuando se commitee.
 4. #12, #13 y los menores según prioridad del negocio.
+
+---
+
+# Estado de la segunda revisión (25-10-2026)
+
+| # | Estado | Qué se hizo |
+|---|---|---|
+| 10 | ⏳ Depende del usuario | Script de sólo lectura `node tool/check-legacy-fields.mjs` (cuenta pedidos con `pickupCode` y locales con `ownerEmail`, sin mostrar valores). No se pudo correr desde la sesión de Claude (lectura de producción bloqueada por permisos). Los pedidos anteriores al 28-09 ya están fuera de su horario, así que un código antiguo ya no sirve para validar un retiro; lo que puede seguir expuesto es `ownerEmail` en locales antiguos. |
+| 11 | ✅ | Un pago aprobado por menos que el pedido se devuelve solo (`refundMismatchedPayment`) y queda en `orders.paymentIssue`. Nueva sección **Admin → Pagos → "Requiere atención"** con los reembolsos fallidos (`refund.status == error`, que antes nadie veía) y los pagos que no calzaban y no se pudieron devolver, con botón **Reintentar** (función `retryRefund`, sólo admin). La clave de idempotencia de los reembolsos ahora es por pago (`refund_{paymentId}`). |
+| 12 | ✅ | El límite de 2 reservas se revisa dentro de la transacción, con un candado por usuario (`orderLocks/{uid}`, sin acceso desde la app). Probado: 4 reservas en paralelo → 2 creadas, 2 rechazadas. |
+| 13 | ❓ Decisión de negocio | Sin cambios: el arrepentimiento de 15 min sigue sirviendo aunque el retiro ya empezó. |
+| 14 | ✅ | Si no se puede leer el código de retiro, se muestra el código guardado en el teléfono; si no hay, un error con "Reintentar". |
+| — | ✅ | `markNoShows` actualiza cada pedido con precondición `lastUpdateTime`: no pisa un retiro validado justo en ese momento. |
+| — | ✅ | Reglas de la cuenta bancaria: el dueño puede borrarla, y se validan `rut` (≤ 12), `bank` (≤ 60, también en el formulario), `accountType` (corriente/vista/ahorro) y `email`. |
+| — | ✅ | El dueño ya no puede editar `lat`, `lng` ni `reviewedAt` de su local. |
+| — | ⏳ Opcional | `pickupCodes/` ahora guarda `expireAt`. Para que Firestore borre solo los vencidos, activar TTL una vez: consola → Firestore → TTL → colección `pickupCodes`, campo `expireAt`. |
+
+Pruebas en emuladores: 17 de 17 (reservas en paralelo, `retryRefund` con y sin permiso, consultas del admin, precondición de no-shows y reglas de ubicación y cuenta bancaria). "Requiere atención" se probó en la app con el admin de prueba.

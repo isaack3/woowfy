@@ -21,6 +21,7 @@ class PayoutsTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.only(bottom: 24),
       children: [
+        const _NeedsAttention(),
         const PayAllBar(),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -33,6 +34,107 @@ class PayoutsTab extends StatelessWidget {
         ),
         const _History(),
       ],
+    );
+  }
+}
+
+/// Dinero de clientes que no se pudo devolver solo (reembolso fallido o pago que no calzaba). Solo aparece si hay algo.
+class _NeedsAttention extends StatelessWidget {
+  const _NeedsAttention();
+
+  @override
+  Widget build(BuildContext context) {
+    final repo = Repository.instance;
+    return StreamBuilder<List<BagOrder>>(
+      stream: repo.watchFailedRefunds(),
+      builder: (context, refunds) => StreamBuilder<List<BagOrder>>(
+        stream: repo.watchFailedPaymentIssues(),
+        builder: (context, issues) {
+          if (refunds.hasError || issues.hasError) {
+            return const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: Text('No pudimos revisar si hay reembolsos fallidos.', style: TextStyle(color: WoowfyColors.muted)),
+            );
+          }
+          final byId = {for (final o in [...?refunds.data, ...?issues.data]) o.id: o};
+          if (byId.isEmpty) return const SizedBox.shrink();
+          final t = Theme.of(context).textTheme;
+          final error = Theme.of(context).colorScheme.error;
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Card(
+              color: WoowfyColors.orangeSoft,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: error)),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Icon(Icons.error_outline, color: error),
+                    const SizedBox(width: 8),
+                    Text('Requiere atención', style: t.titleMedium?.copyWith(color: error)),
+                  ]),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Mercado Pago no aceptó estas devoluciones. Reintenta; si vuelve a fallar, devuélvelo desde el panel '
+                    'de Mercado Pago con el número de pedido.',
+                    style: t.bodySmall,
+                  ),
+                  const SizedBox(height: 8),
+                  for (final o in byId.values) _AttentionRow(order: o),
+                ]),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _AttentionRow extends StatefulWidget {
+  const _AttentionRow({required this.order});
+
+  final BagOrder order;
+
+  @override
+  State<_AttentionRow> createState() => _AttentionRowState();
+}
+
+class _AttentionRowState extends State<_AttentionRow> {
+  bool _busy = false;
+
+  Future<void> _retry() async {
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _busy = true);
+    try {
+      final ok = await Repository.instance.retryRefund(widget.order.id);
+      messenger.showSnackBar(SnackBar(
+        content: Text(ok ? 'Listo: el dinero se devolvió.' : 'Mercado Pago volvió a rechazarlo. Revisa el motivo.'),
+      ));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(friendlyError(e, fallback: 'No se pudo reintentar. Intenta de nuevo.'))));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final o = widget.order;
+    final mismatch = o.paymentIssueStatus == 'error';
+    final what = mismatch
+        ? 'Pago de ${formatClp(o.paymentIssueAmount ?? 0)} que no calzaba con el pedido (${formatClp(o.amount)})'
+        : 'Reembolso de ${formatClp(o.amount)}';
+    final why = mismatch ? o.paymentIssueError : o.refundError;
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text('${o.storeName} · ${o.bagTitle}'),
+      subtitle: Text([what, 'Pedido ${o.id}', if (why != null && why.isNotEmpty) why].join('\n')),
+      isThreeLine: true,
+      trailing: FilledButton.tonal(
+        onPressed: _busy ? null : _retry,
+        child: Text(_busy ? 'Reintentando…' : 'Reintentar'),
+      ),
     );
   }
 }

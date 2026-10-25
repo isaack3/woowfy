@@ -6,7 +6,8 @@ initializeApp();
 setGlobalOptions({ region: "southamerica-west1", maxInstances: 10 });
 
 export {
-  cancelBag, cancelOrder, confirmMockPayment, createOrder, expirePendingOrders, markNoShows, mercadoPagoWebhook, redeemOrder, syncOrderPayment,
+  cancelBag, cancelOrder, confirmMockPayment, createOrder, expirePendingOrders, markNoShows, mercadoPagoWebhook, redeemOrder,
+  retryRefund, syncOrderPayment,
 } from "./orders.js";
 export { rateOrder } from "./reviews.js";
 export { createAllPayouts, createPayout, voidPayout } from "./payouts.js";

@@ -80,6 +80,28 @@ class Repository {
       .snapshots()
       .map((s) => s.docs.map(BagOrder.fromDoc).where((o) => o.payoutId == null).toList());
 
+  /// Admin: pedidos con un reembolso que falló.
+  Stream<List<BagOrder>> watchFailedRefunds() => _db
+      .collection('orders')
+      .where('refund.status', isEqualTo: 'error')
+      .limit(100)
+      .snapshots()
+      .map((s) => s.docs.map(BagOrder.fromDoc).toList());
+
+  /// Admin: pedidos con un pago que no calzaba con el monto y cuya devolución falló.
+  Stream<List<BagOrder>> watchFailedPaymentIssues() => _db
+      .collection('orders')
+      .where('paymentIssue.status', isEqualTo: 'error')
+      .limit(100)
+      .snapshots()
+      .map((s) => s.docs.map(BagOrder.fromDoc).toList());
+
+  /// Admin: reintenta un reembolso que falló. Devuelve true si quedó devuelto.
+  Future<bool> retryRefund(String orderId) async {
+    final res = await functions.httpsCallable('retryRefund').call<Map<String, dynamic>>({'orderId': orderId});
+    return res.data['refund'] != 'error' && res.data['paymentIssue'] != 'error';
+  }
+
   /// Admin: liquida a todos los locales con ventas pendientes. Devuelve lo registrado por local.
   /// Liquida solo a [storeIds] (los revisados en la vista previa). El servidor salta los locales sin cuenta bancaria.
   Future<List<Map<String, dynamic>>> createAllPayouts(String note, List<String> storeIds) async {
