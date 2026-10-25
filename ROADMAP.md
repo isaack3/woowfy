@@ -165,6 +165,27 @@ y desplegada el 28-09; datos de producción migrados
 - [x] Guía para comercios en `woowfy.com/merchants` (calculadora, consejos, retiros, cancelaciones, pagos) y enlace
       desde el panel del local
 
+**Etapa C2 — Cumplimiento legal (25-10) ✅** · probada en emuladores (18 pruebas) y desplegada
+- [x] Aviso de no retracto (alimentos perecibles) antes de pagar, junto a las cancelaciones, y "Al reservar aceptas
+      los Términos y la Política de privacidad" bajo el botón
+- [x] N° de resolución sanitaria obligatorio al pedir el alta y editable en el perfil del local; ni el admin aprueba
+      un local sin él (reglas de Firestore)
+- [x] "Eliminar mi cuenta" en Cuenta (Ley 21.719): borra perfil, favoritos, avisos, lista de espera, fotos y acceso;
+      las compras quedan sin datos personales y las opiniones como "Cliente". Bloqueado para dueños de local, admins
+      y quien tenga un pedido pagado por retirar
+- [x] Cancelar una reserva ya no falla si el local borró la bolsa
+- [ ] Agregar el N° de resolución sanitaria a tu local "Woowfy App" (Mi local → perfil)
+
+**Etapa C3 — Documentos tributarios (por hacer, urgente con Mercado Pago en producción)**
+Decidido el 25-10: Passva SpA es **comisionista** (como Too Good To Go): vende a nombre propio por cuenta del local,
+emite la boleta al cliente y, en cada liquidación, una **liquidación-factura** (DTE 43) al local descontando su
+comisión. Términos ya ajustados (borrador). Falta confirmarlo con el contador.
+- [ ] Contador: confirmar comisión mercantil + liquidación-factura e IVA de alimentos
+- [ ] Elegir proveedor de documentos electrónicos con API (boletas y liquidaciones-factura)
+- [ ] Boleta electrónica automática al pagarse cada pedido (función + envío por correo)
+- [ ] Liquidación-factura automática al registrar cada liquidación ("Liquidar todos")
+- [ ] Mientras tanto: emitir a mano en el portal del SII la boleta de cada venta real
+
 **Etapa D — Pagos divididos con Mercado Pago Marketplace** (después de la SpA; ver sección "Pagos divididos")
 - [ ] Cada local conecta su cuenta de Mercado Pago; MP le deposita el 75% y a Woowfy el 25% en cada compra
 
@@ -232,7 +253,7 @@ Puntajes (heurísticas de Nielsen): Home 22/40 · flujo cliente 22/40 · comerci
 - [x] "Mi local" en la barra de la app para quien tiene un local aprobado
 - [x] Publicar "igual que ayer": el formulario parte con los datos (y la foto) de la última bolsa; "Publicar de nuevo" en cada bolsa
 - [x] Editar bolsas (nombre, descripción, precios, sumar unidades) y recurrentes; con compradores, el horario queda fijo
-- [x] Mientras te aprueban: checklist con logo y horario, cuenta bancaria y guía (plazo "normalmente 1 día hábil"); el envío de la solicitud ya no falla en silencio
+- [x] Mientras te aprueban: checklist con logo y horario, cuenta bancaria y guía (plazo "normalmente 2 a 3 días hábiles"); el envío de la solicitud ya no falla en silencio
 - [x] Publicar no se cierra al tocar fuera; "Bolsa publicada · Ver como cliente"
 - [x] Interruptores con nombre para lectores de pantalla; menú ⋮ con Editar, Publicar de nuevo y Cancelar
 
@@ -283,7 +304,7 @@ Puntajes (heurísticas de Nielsen): Home 22/40 · flujo cliente 22/40 · comerci
 - [ ] 🔐 Verificación de marca en Google Auth Platform (opcional ahora: el inicio de sesión ya dice "Ir a woowfy.com")
 - [ ] 📷 Probar el escáner QR nuevo en iPhone (Safari) con una compra de prueba
 - [ ] 💸 Probar la liquidación: cuenta bancaria en *Ventas y pagos* y Admin → Pagos → "Liquidar todos" (si fue de prueba, "Anular")
-- [ ] ✏️ Confirmar en la guía para comercios "pago semanal" y "aprobación en 1 día hábil" (y en los términos)
+- [x] ✏️ Confirmados "pago semanal" y aprobación en "2 a 3 días hábiles" (guía, panel del local y preguntas frecuentes, 25-10)
 - [ ] Confirmar en tu navegador que al recargar `app.woowfy.com/merchant` sigues con sesión
 - [x] 🔔 **Clave VAPID** para notificaciones push (25-10). Falta probar: Cuenta → Notificaciones → Activar, seguir un local
       y publicar una bolsa desde ese local (debe llegar el aviso)

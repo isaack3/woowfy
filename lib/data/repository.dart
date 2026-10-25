@@ -175,6 +175,7 @@ class Repository {
     required String comuna,
     required String address,
     required String phone,
+    required String sanitaryPermit,
     String? category,
   }) {
     return _stores.add({
@@ -185,6 +186,7 @@ class Repository {
       'comuna': comuna,
       'address': address,
       'phone': phone,
+      'sanitaryPermit': sanitaryPermit,
       'status': StoreStatus.pending.value,
       'createdAt': FieldValue.serverTimestamp(),
     });
@@ -198,6 +200,9 @@ class Repository {
       });
 
   // --- Admin -------------------------------------------------------------------
+
+  /// Elimina la cuenta y los datos personales (el servidor valida que no tenga local ni pedidos por retirar).
+  Future<void> deleteAccount() => functions.httpsCallable('deleteAccount').call();
 
   /// El usuario cambia su nombre (las reglas no le dejan tocar su rol).
   Future<void> updateMyName(String uid, String name) =>

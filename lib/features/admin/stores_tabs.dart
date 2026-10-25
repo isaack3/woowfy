@@ -25,8 +25,9 @@ class PendingStoresTab extends StatelessWidget {
               askReason: 'Motivo del rechazo (lo verá el comercio)'),
           child: const Text('Rechazar'),
         ),
+        // Sin resolución sanitaria no se aprueba (también lo exigen las reglas de Firestore).
         FilledButton(
-          onPressed: () => _changeStatus(context, store, StoreStatus.approved),
+          onPressed: store.hasSanitaryPermit ? () => _changeStatus(context, store, StoreStatus.approved) : null,
           child: const Text('Aprobar'),
         ),
       ],
@@ -75,13 +76,13 @@ class _StoresTabState extends State<StoresTab> {
                 ],
               StoreStatus.suspended => [
                   FilledButton.tonal(
-                    onPressed: () => _changeStatus(context, store, StoreStatus.approved),
+                    onPressed: store.hasSanitaryPermit ? () => _changeStatus(context, store, StoreStatus.approved) : null,
                     child: const Text('Activar'),
                   ),
                 ],
               _ => [
                   FilledButton.tonal(
-                    onPressed: () => _changeStatus(context, store, StoreStatus.approved),
+                    onPressed: store.hasSanitaryPermit ? () => _changeStatus(context, store, StoreStatus.approved) : null,
                     child: const Text('Activar'),
                   ),
                 ],
@@ -163,6 +164,13 @@ class _StoreCard extends StatelessWidget {
                 if (store.phone != null) _Contact(icon: Icons.phone_outlined, text: store.phone!, style: muted),
               ],
             ),
+            store.hasSanitaryPermit
+                ? _Contact(icon: Icons.verified_outlined, text: 'Resolución sanitaria N° ${store.sanitaryPermit}', style: muted)
+                : _Contact(
+                    icon: Icons.warning_amber_outlined,
+                    text: 'Sin resolución sanitaria: pídela al local antes de aprobarlo',
+                    style: muted?.copyWith(color: Theme.of(context).colorScheme.error),
+                  ),
             if (store.status == StoreStatus.approved || store.status == StoreStatus.suspended)
               StreamBuilder<BankAccount?>(
                 stream: Repository.instance.watchBankAccount(store.id),
@@ -208,7 +216,7 @@ class _Contact extends StatelessWidget {
       children: [
         Icon(icon, size: 16, color: style?.color),
         const SizedBox(width: 4),
-        SelectableText(text, style: style),
+        Flexible(child: SelectableText(text, style: style)),
       ],
     );
   }

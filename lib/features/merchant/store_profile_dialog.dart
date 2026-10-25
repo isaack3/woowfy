@@ -28,6 +28,7 @@ class _StoreProfileDialogState extends State<StoreProfileDialog> {
   late final _address = TextEditingController(text: widget.store.address);
   late final _comuna = TextEditingController(text: widget.store.comuna);
   late final _phone = TextEditingController(text: widget.store.phone ?? '');
+  late final _permit = TextEditingController(text: widget.store.sanitaryPermit ?? '');
   late String? _category = widget.store.category;
   late String? _region = chileRegions.contains(widget.store.region) ? widget.store.region : null;
   Uint8List? _logo;
@@ -37,7 +38,7 @@ class _StoreProfileDialogState extends State<StoreProfileDialog> {
 
   @override
   void dispose() {
-    for (final c in [_name, _description, _hours, _address, _comuna, _phone]) {
+    for (final c in [_name, _description, _hours, _address, _comuna, _phone, _permit]) {
       c.dispose();
     }
     super.dispose();
@@ -71,6 +72,7 @@ class _StoreProfileDialogState extends State<StoreProfileDialog> {
         'comuna': _comuna.text.trim(),
         'region': _region,
         'phone': _phone.text.trim(),
+        'sanitaryPermit': _permit.text.trim(),
         'logoUrl': logoUrl,
       });
       if (mounted) Navigator.pop(context);
@@ -154,6 +156,16 @@ class _StoreProfileDialogState extends State<StoreProfileDialog> {
                   controller: _phone,
                   keyboardType: TextInputType.phone,
                   decoration: const InputDecoration(labelText: 'Teléfono de contacto'),
+                  validator: required,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _permit,
+                  maxLength: 40,
+                  decoration: const InputDecoration(
+                    labelText: 'N° de resolución sanitaria',
+                    helperText: 'La entrega la SEREMI de Salud. Mantenla vigente para seguir publicando.',
+                  ),
                   validator: required,
                 ),
                 if (_error != null) ...[

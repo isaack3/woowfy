@@ -85,7 +85,7 @@ class _PendingChecklist extends StatelessWidget {
         Text('Tu solicitud está en revisión', style: t.headlineSmall, textAlign: TextAlign.center),
         const SizedBox(height: 6),
         Text(
-          'Normalmente la revisamos en 1 día hábil y te contactamos para validar tu local. Mientras, deja todo listo:',
+          'Normalmente la revisamos en 2 a 3 días hábiles y te contactamos para validar tu local. Mientras, deja todo listo:',
           style: t.bodyMedium?.copyWith(color: WoowfyColors.muted),
           textAlign: TextAlign.center,
         ),
@@ -204,6 +204,7 @@ class _StoreRequestFormState extends State<_StoreRequestForm> {
   late final _name = TextEditingController(text: widget.rejected?.name);
   late final _address = TextEditingController(text: widget.rejected?.address);
   late final _phone = TextEditingController(text: widget.rejected?.phone);
+  late final _permit = TextEditingController(text: widget.rejected?.sanitaryPermit);
   late final _comuna = TextEditingController(text: widget.rejected?.comuna);
   late String? _region = chileRegions.contains(widget.rejected?.region) ? widget.rejected!.region : null;
   late String? _category =
@@ -215,6 +216,7 @@ class _StoreRequestFormState extends State<_StoreRequestForm> {
     _name.dispose();
     _address.dispose();
     _phone.dispose();
+    _permit.dispose();
     _comuna.dispose();
     super.dispose();
   }
@@ -232,6 +234,7 @@ class _StoreRequestFormState extends State<_StoreRequestForm> {
           'comuna': _comuna.text.trim(),
           'address': _address.text.trim(),
           'category': _category,
+          'sanitaryPermit': _permit.text.trim(),
         });
         return;
       }
@@ -242,6 +245,7 @@ class _StoreRequestFormState extends State<_StoreRequestForm> {
         region: _region!,
         comuna: _comuna.text.trim(),
         address: _address.text.trim(),
+        sanitaryPermit: _permit.text.trim(),
         category: _category,
       );
     } catch (e) {
@@ -322,6 +326,18 @@ class _StoreRequestFormState extends State<_StoreRequestForm> {
             controller: _phone,
             keyboardType: TextInputType.phone,
             decoration: const InputDecoration(labelText: 'Teléfono de contacto', hintText: '+56 9 1234 5678'),
+            validator: required,
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _permit,
+            maxLength: 40,
+            decoration: const InputDecoration(
+              labelText: 'N° de resolución sanitaria',
+              helperText: 'La entrega la SEREMI de Salud. La revisamos antes de aprobar tu local; '
+                  'te podemos pedir una copia.',
+              helperMaxLines: 2,
+            ),
             validator: required,
           ),
           const SizedBox(height: 24),

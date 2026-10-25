@@ -151,7 +151,7 @@ Todo lo que Woowfy usa fuera del repositorio, dónde vive y para qué. Al agrega
 
 | Región | Funciones |
 |---|---|
-| **`southamerica-west1`** (Santiago), 23 | **Pedidos y pagos:** `createOrder`, `syncOrderPayment`, `cancelOrder`, `cancelBag`, `redeemOrder`, `confirmMockPayment` (solo con `mock`), `retryRefund`, `mercadoPagoWebhook` (HTTP) · **Liquidaciones:** `createPayout`, `createAllPayouts`, `voidPayout` · **Calificaciones:** `rateOrder` · **Correos:** `onOrderUpdated`, `onWaitlistCreated`, `sendTestEmail`, `previewEmail`, `sendLaunchEmails` · **Locales y bolsas:** `onStoreCreated`, `onStoreUpdated`, `onBagCreated`, `onBagTemplateWritten` · **Landing:** `joinWaitlist` (HTTP, `/api/waitlist`), `trackEvent` (HTTP, analítica anónima) |
+| **`southamerica-west1`** (Santiago), 24 | **Pedidos y pagos:** `createOrder`, `syncOrderPayment`, `cancelOrder`, `cancelBag`, `redeemOrder`, `confirmMockPayment` (solo con `mock`), `retryRefund`, `mercadoPagoWebhook` (HTTP) · **Liquidaciones:** `createPayout`, `createAllPayouts`, `voidPayout` · **Calificaciones:** `rateOrder` · **Correos:** `onOrderUpdated`, `onWaitlistCreated`, `sendTestEmail`, `previewEmail`, `sendLaunchEmails` · **Locales y bolsas:** `onStoreCreated`, `onStoreUpdated`, `onBagCreated`, `onBagTemplateWritten` · **Cuenta:** `deleteAccount` (eliminar mi cuenta, Ley 21.719) · **Landing:** `joinWaitlist` (HTTP, `/api/waitlist`), `trackEvent` (HTTP, analítica anónima) |
 | **`southamerica-east1`** (São Paulo), 4 programadas | `expirePendingOrders` (cada 5 min) · `markNoShows` (cada 30 min) · `sendPickupReminders` (cada 15 min) · `publishRecurringBags` (todos los días, 05:00 hora de Chile) |
 
 Todas usan 256 MB y como máximo 10 instancias (`setGlobalOptions` en `functions/src/index.ts`).

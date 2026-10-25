@@ -8,6 +8,7 @@ import '../../core/errors.dart';
 import '../../core/analytics.dart';
 import '../../core/checkout.dart';
 import '../../core/format.dart';
+import '../../core/legal.dart';
 import '../../core/theme.dart';
 import '../../data/models.dart';
 import '../../data/repository.dart';
@@ -237,6 +238,7 @@ class _Detail extends StatelessWidget {
             if (!bag.soldOut) ...[const SizedBox(height: 12), const _Rules()],
             const SizedBox(height: 16),
             _PendingOr(bag: bag, child: resume && !bag.soldOut ? _ResumeReserve(bag: bag) : _ReserveButton(bag: bag)),
+            if (!bag.soldOut) ...[const SizedBox(height: 8), const LegalNotice(prefix: 'Al reservar aceptas')],
             const _FeeSplit(),
             if (bag.storeRatingCount > 0) ...[const SizedBox(height: 24), _Reviews(storeId: bag.storeId)],
             const SizedBox(height: 12),
@@ -439,6 +441,7 @@ class _Rules extends StatelessWidget {
           rule(Icons.timer_outlined, ruleHold),
           rule(Icons.schedule, rulePickupWindow),
           rule(Icons.undo, ruleCancel),
+          rule(Icons.gavel_outlined, ruleNoRetracto),
           rule(Icons.info_outline, ruleNoShow),
         ]),
       ),

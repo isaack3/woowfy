@@ -17,3 +17,4 @@ export { onOrderUpdated, onWaitlistCreated, previewEmail, sendLaunchEmails, send
 export { onBagTemplateWritten, publishRecurringBags } from "./recurring.js";
 export { onStoreCreated, onStoreUpdated } from "./stores.js";
 export { onBagCreated, sendPickupReminders } from "./notifications.js";
+export { deleteAccount } from "./account.js";

@@ -122,6 +122,7 @@ class Store {
     this.region = '',
     this.ownerEmail,
     this.phone,
+    this.sanitaryPermit,
     this.statusReason,
     this.createdAt,
     this.category,
@@ -143,6 +144,9 @@ class Store {
   final String region;
   final String? ownerEmail;
   final String? phone;
+  /// N° de resolución sanitaria (SEREMI de Salud). Obligatorio para aprobar el local.
+  final String? sanitaryPermit;
+  bool get hasSanitaryPermit => (sanitaryPermit ?? '').trim().isNotEmpty;
   /// Motivo del rechazo o suspensión, visible para el comercio.
   final String? statusReason;
   final DateTime? createdAt;
@@ -170,6 +174,7 @@ class Store {
       region: d['region'] as String? ?? '',
       ownerEmail: d['ownerEmail'] as String?,
       phone: d['phone'] as String?,
+      sanitaryPermit: d['sanitaryPermit'] as String?,
       statusReason: d['statusReason'] as String?,
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
       category: d['category'] as String?,
@@ -541,6 +546,10 @@ String get ruleCancel =>
     'de pagar si el retiro aún no empieza.';
 /// Llegar dentro del horario: antes, el local puede no tener la bolsa lista.
 const rulePickupWindow = 'Llega dentro del horario de retiro: antes, el local aún puede estar armando tu bolsa.';
+
+/// Exclusión del derecho a retracto (art. 3 bis, Ley 19.496): para que valga, se informa antes de pagar (ver /terms, punto 6).
+const ruleNoRetracto = 'Por ser alimentos perecibles, no aplica el derecho a retracto: en su lugar rigen las '
+    'cancelaciones con reembolso de arriba.';
 
 String get ruleNoShow =>
     'Si no la retiras hasta ${noShowGraceMinutes ~/ 60} h después del horario, no hay reembolso: el local ya te la apartó.';

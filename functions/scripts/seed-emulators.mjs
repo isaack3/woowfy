@@ -56,6 +56,7 @@ const store = {
   region: "Metropolitana de Santiago",
   address: "Av. Providencia 1234",
   phone: "+56 9 3333 4444",
+  sanitaryPermit: "2023-4471",
   status: "approved",
   createdAt: FieldValue.serverTimestamp(),
 };

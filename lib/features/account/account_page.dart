@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/errors.dart';
 import '../../core/legal.dart';
 import '../../core/theme.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -189,9 +190,61 @@ class _SignedIn extends StatelessWidget {
               if (context.mounted) context.go('/');
             },
           ),
+          const Divider(height: 1),
+          ListTile(
+            leading: Icon(Icons.person_remove_outlined, color: Theme.of(context).colorScheme.error),
+            title: const Text('Eliminar mi cuenta'),
+            subtitle: const Text('Borra tus datos personales de Woowfy'),
+            onTap: () => _deleteAccount(context),
+          ),
         ],
       ),
     );
+  }
+}
+
+/// Derecho de supresión: confirma y elimina la cuenta en el servidor (que borra perfil, favoritos y acceso).
+Future<void> _deleteAccount(BuildContext context) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final router = GoRouter.of(context);
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Eliminar mi cuenta'),
+      content: const Text(
+        'Se borrarán tu perfil, tus locales favoritos, tus avisos y tu acceso a Woowfy. Tus reservas sin pagar se '
+        'cancelan. Tus compras pasadas se conservan sin tu nombre ni correo, porque la ley tributaria nos obliga a '
+        'guardarlas.\n\nEsto no se puede deshacer.',
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.error,
+            foregroundColor: Colors.white,
+          ),
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Eliminar mi cuenta'),
+        ),
+      ],
+    ),
+  );
+  if (ok != true) return;
+  messenger.showSnackBar(const SnackBar(content: Text('Eliminando tu cuenta…')));
+  try {
+    await Repository.instance.deleteAccount();
+    await FirebaseAuth.instance.signOut();
+    router.go('/');
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(content: Text('Tu cuenta y tus datos personales fueron eliminados.')));
+  } catch (e) {
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(friendlyError(e, fallback: 'No pudimos eliminar tu cuenta. Intenta de nuevo.')),
+        duration: const Duration(seconds: 8),
+      ));
   }
 }
 

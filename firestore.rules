@@ -39,6 +39,14 @@ service cloud.firestore {
     }
 
     match /stores/{storeId} {
+      // N° de resolución sanitaria (SEREMI): texto corto; obligatorio al pedir el alta y para estar aprobado.
+      function validPermit(d) {
+        return !('sanitaryPermit' in d) || (d.sanitaryPermit is string && d.sanitaryPermit.size() <= 40);
+      }
+      function hasPermit(d) {
+        return 'sanitaryPermit' in d && d.sanitaryPermit is string && d.sanitaryPermit.size() > 0
+          && d.sanitaryPermit.size() <= 40;
+      }
       allow read: if resource.data.status == 'approved'
         || (signedIn() && resource.data.ownerUid == request.auth.uid)
         || isAdmin();
@@ -48,11 +56,17 @@ service cloud.firestore {
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.status == 'pending'
         && request.resource.data.keys().hasOnly(['ownerUid', 'name', 'category', 'region', 'comuna',
-             'address', 'phone', 'status', 'createdAt']);
+             'address', 'phone', 'sanitaryPermit', 'status', 'createdAt'])
+        && hasPermit(request.resource.data);
       // El dueño edita sus datos pero no su estado (salvo reenviar una solicitud rechazada);
       // el admin aprueba, rechaza o suspende.
-      allow update: if isAdmin() || (signedIn()
+      // Ningún local pasa a aprobado sin N° de resolución sanitaria (ni siquiera lo aprueba el admin).
+      allow update: if (isAdmin() && (resource.data.status == 'approved'
+          || request.resource.data.status != 'approved' || hasPermit(request.resource.data)))
+        || (signedIn()
         && resource.data.ownerUid == request.auth.uid
+        && validPermit(request.resource.data)
+        && (request.resource.data.status != 'approved' || hasPermit(request.resource.data))
         && request.resource.data.ownerUid == resource.data.ownerUid
         && !touchesRating(resource.data, request.resource.data)
         // La ubicación la calcula el servidor desde la dirección (onStoreUpdated) y la revisión la hace el admin.

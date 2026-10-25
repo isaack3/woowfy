@@ -265,8 +265,11 @@ export async function cancelPendingOrder(orderId: string, reason: string): Promi
   await db.runTransaction(async (tx) => {
     const order = (await tx.get(ref)).data();
     if (!order || order.status !== "pending_payment") return;
+    const bagRef = db.collection("bags").doc(order.bagId);
+    const bagExists = (await tx.get(bagRef)).exists;
     tx.update(ref, { status: "cancelled", cancelReason: reason, cancelledAt: FieldValue.serverTimestamp() });
-    tx.update(db.collection("bags").doc(order.bagId), { quantityAvailable: FieldValue.increment(1) });
+    // El local puede haber borrado la bolsa: entonces no hay stock que devolver (y no debe fallar la cancelación).
+    if (bagExists) tx.update(bagRef, { quantityAvailable: FieldValue.increment(1) });
   });
 }
 
@@ -313,11 +316,13 @@ export const cancelOrder = onCall({ secrets: PAYMENT_SECRETS }, async (req) => {
   await db.runTransaction(async (tx) => {
     const fresh = (await tx.get(ref)).data();
     if (fresh?.status !== "paid") throw new HttpsError("aborted", "Este pedido ya no se puede cancelar.");
+    const bagRef = db.collection("bags").doc(fresh.bagId);
+    const bagExists = (await tx.get(bagRef)).exists;
     tx.update(ref, {
       status: "cancelled", cancelReason: "customer", cancelledAt: FieldValue.serverTimestamp(),
       refund: { status: "pending", amount: fresh.amount },
     });
-    tx.update(db.collection("bags").doc(fresh.bagId), { quantityAvailable: FieldValue.increment(1) });
+    if (bagExists) tx.update(bagRef, { quantityAvailable: FieldValue.increment(1) });
   });
   await refundOrder(orderId);
   return { refunded: true };
