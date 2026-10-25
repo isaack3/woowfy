@@ -123,11 +123,53 @@ stateDiagram-v2
 | App (web hoy; Android/iOS después) | Flutter · go_router · Material 3 · flutter_map (OpenStreetMap) |
 | Landing | HTML + CSS estático (`landing/`), pensado para SEO, con lista de espera y páginas legales |
 | Backend | Firebase: Auth (correo + Google), Firestore, Storage (fotos), Cloud Functions (TypeScript, Node 22), Cloud Messaging (push), Hosting |
-| Pagos | Proveedor intercambiable: `mock` hoy, Mercado Pago después |
-| Correos | Resend (plantillas listas; falta activar la cuenta) |
+| Pagos | Mercado Pago Checkout Pro en **producción** (cuenta de Passva SpA). Proveedor intercambiable: `mock` en los emuladores |
+| Correos | Resend (dominio `woowfy.com` verificado el 25-10-2026) |
 | Builds móviles | Codemagic (`codemagic.yaml`), para compilar iOS sin Mac |
 
 Proyecto Firebase: **`woowfy-app`** (plan Blaze). Paquete Android / Bundle iOS: `com.woowfy.woowfy`.
+
+## Inventario de servicios
+
+Todo lo que Woowfy usa fuera del repositorio, dónde vive y para qué. Al agregar o mover un servicio, actualizar aquí.
+
+### Google Cloud / Firebase (proyecto `woowfy-app`, plan Blaze)
+
+| Servicio | Región | Para qué | Notas |
+|---|---|---|---|
+| Firestore (modo nativo) | `southamerica-west1` (Santiago) | Base de datos: locales, bolsas, pedidos, liquidaciones, configuración | Reglas en `firestore.rules`, índices en `firestore.indexes.json` |
+| Cloud Functions (2.ª gen, Node 22) | Santiago y São Paulo (ver tabla de abajo) | Toda la lógica de dinero, correos, avisos y tareas programadas | Código en `functions/src` |
+| Cloud Scheduler | `southamerica-east1` (São Paulo) | Dispara las 4 funciones programadas | No existe en Santiago |
+| Cloud Storage | Santiago | Fotos de bolsas y logos (`uploads/{uid}/…`) | Bucket `woowfy-app.firebasestorage.app`; reglas en `storage.rules`; CORS en `storage-cors.json` |
+| Firebase Authentication | Global | Ingreso con correo y con Google | `authDomain` = `app.woowfy.com`; cliente OAuth en Google Auth Platform |
+| Firebase Hosting | Global (CDN) | Sitio `woowfy-app` → `woowfy.com` (landing) · sitio `woowfy-app-web` → `app.woowfy.com` (app) | Guarda las últimas 5 versiones de cada sitio |
+| Cloud Messaging (FCM) | Global | Notificaciones push web | Inactivo hasta poner la clave VAPID en `lib/core/push.dart` |
+| Secret Manager | Global | `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`, `RESEND_API_KEY` | Nunca en archivos del repositorio |
+| Cloud Build / Artifact Registry | Región de cada función | Compila y guarda las imágenes de las funciones al desplegar | Las imágenes se borran a 1 día |
+
+### Cloud Functions por región
+
+| Región | Funciones |
+|---|---|
+| **`southamerica-west1`** (Santiago), 22 | **Pedidos y pagos:** `createOrder`, `syncOrderPayment`, `cancelOrder`, `cancelBag`, `redeemOrder`, `confirmMockPayment` (solo con `mock`), `retryRefund`, `mercadoPagoWebhook` (HTTP) · **Liquidaciones:** `createPayout`, `createAllPayouts`, `voidPayout` · **Calificaciones:** `rateOrder` · **Correos:** `onOrderUpdated`, `onWaitlistCreated`, `sendTestEmail`, `previewEmail` · **Locales y bolsas:** `onStoreCreated`, `onStoreUpdated`, `onBagCreated`, `onBagTemplateWritten` · **Landing:** `joinWaitlist` (HTTP, `/api/waitlist`), `trackEvent` (HTTP, analítica anónima) |
+| **`southamerica-east1`** (São Paulo), 4 programadas | `expirePendingOrders` (cada 5 min) · `markNoShows` (cada 30 min) · `sendPickupReminders` (cada 15 min) · `publishRecurringBags` (todos los días, 05:00 hora de Chile) |
+
+Todas usan 256 MB y como máximo 10 instancias (`setGlobalOptions` en `functions/src/index.ts`).
+
+### Servicios externos
+
+| Servicio | Cuenta / plan | Región | Para qué | Configuración |
+|---|---|---|---|---|
+| **Mercado Pago** (Checkout Pro) | Cuenta de **Passva SpA**, credenciales de **producción** (desde el 25-10-2026) | — | Cobros, reembolsos y conciliación | Webhook `https://southamerica-west1-woowfy-app.cloudfunctions.net/mercadoPagoWebhook` (evento Pagos); `MP_ACCESS_TOKEN` y `MP_WEBHOOK_SECRET` en Secret Manager |
+| **Resend** | Equipo `passva`, plan gratis | `sa-east-1` (São Paulo) | Correos de bienvenida, compra y reembolso desde `hola@woowfy.com` | Dominio `woowfy.com` verificado (DKIM, SPF y DMARC); recepción **desactivada**; clave "Woowfy Key" solo de envío, guardada como `RESEND_API_KEY` |
+| **Piensa Solutions** | Registrador y DNS de `woowfy.com` | — | Dominio y todos sus registros DNS | Ver [Dominios](#dominios) |
+| **OpenStreetMap** | Sin cuenta ni clave | — | Mapa de la app (teselas, `flutter_map`) y geocodificación de direcciones (Nominatim, desde `functions/src/geo.ts`) | Máx. 1 consulta por segundo a Nominatim |
+| **Google Fonts** | Sin cuenta | — | Tipografía Lato en la landing y las páginas legales | — |
+| **jsDelivr** | Sin cuenta | — | Lector de QR en la web (jsQR) | — |
+| **Google Search Console** | Cuenta de Google | — | Verificación e indexación de `woowfy.com` | TXT `google-site-verification` en el DNS |
+| **Codemagic** | Aún sin usar | — | Compilar Android/iOS en la nube | `codemagic.yaml` |
+
+Contacto público: `hola@passva.com` (Passva SpA). `hola@woowfy.com` solo envía, a través de Resend.
 
 ## Estructura
 
@@ -313,6 +355,17 @@ DNS administrado en **Piensa Solutions**.
 | `www.woowfy.com` | CNAME `woowfy-app.web.app` | `woowfy-app` (landing) |
 | `app.woowfy.com` | CNAME `woowfy-app-web.web.app` | `woowfy-app-web` (app) |
 
+Registros de **Resend** (envío de correos desde `@woowfy.com`, agregados el 25-10-2026):
+
+| Nombre | Tipo | Valor |
+|---|---|---|
+| `resend._domainkey` | TXT | Clave DKIM (`p=MIGfMA0…IDAQAB`, la entrega Resend) |
+| `send` | CNAME | `send.forge.rmta.net` |
+| `rsend` | CNAME | `rsend-sae1.forge.rmta.net` |
+| `_dmarc` | TXT | `v=DMARC1; p=none;` |
+
+`woowfy.com` no tiene MX: no recibe correos (la recepción de Resend está desactivada a propósito).
+
 Un nombre con CNAME no puede tener otros registros, y el dominio raíz (`@`) no admite CNAME.
 El TXT `google-site-verification` es de Google Search Console: no borrarlo.
 
@@ -384,7 +437,8 @@ Plantillas en `functions/src/email.ts` (HTML con la paleta de la marca):
 - Cada correo de pedido se envía una sola vez: queda registrado en el pedido (`sent` / `skipped` / `error`).
 - La API key va en Secret Manager: `firebase functions:secrets:set RESEND_API_KEY` y luego
   `firebase deploy --only functions:onWaitlistCreated,functions:onOrderUpdated,functions:sendTestEmail`.
-  Hoy tiene un valor provisional: con el interruptor apagado no se envía nada.
+  Configurada el 25-10-2026 (clave "Woowfy Key", solo envío, dominio `woowfy.com`). Con el interruptor de
+  Admin → Correo apagado no se envía nada.
 - Correo de contacto: `hola@passva.com` (Passva SpA, dueña de Woowfy). `hola@woowfy.com` solo envía (Resend) y las respuestas van a `hola@passva.com`.
 - "Recuperar contraseña" lo envía Firebase Auth (en español), no Resend.
 
@@ -410,9 +464,11 @@ de lista de espera, el registro, el alta de comercios y la pantalla Cuenta.
 
 ## Pagos (Mercado Pago)
 
-`functions/.env` → `PAYMENTS_PROVIDER=mercadopago` (**activo desde el 28-09-2026** con una cuenta de prueba: el
-token `APP_USR-` es de un usuario de prueba, así que no se cobra dinero real). Con `mock` el checkout es simulado.
-Compra de punta a punta probada: pago aprobado → webhook → pedido pagado con QR.
+`functions/.env` → `PAYMENTS_PROVIDER=mercadopago`. **En producción desde el 25-10-2026** con la cuenta de
+Mercado Pago de Passva SpA: **cada compra cobra dinero real** (para probar, cancela dentro de los 15 min y se
+reembolsa). Antes, desde el 28-09-2026, funcionó con una cuenta de prueba. En los emuladores se usa `mock`
+(`functions/.env.local`), con checkout simulado. Compra de punta a punta probada: pago aprobado → webhook →
+pedido pagado con QR.
 
 Para configurarlo desde cero (**Checkout Pro**):
 
@@ -422,7 +478,7 @@ Para configurarlo desde cero (**Checkout Pro**):
 2. En la aplicación → *Webhooks* → URL `https://southamerica-west1-woowfy-app.cloudfunctions.net/mercadoPagoWebhook`,
    evento **Pagos**. Copia la **clave secreta** que muestra. Si alguna vez la regeneras, guárdala de nuevo:
    si no calza, el webhook responde 401 y los pedidos quedan pendientes (los rescata la conciliación).
-3. Guarda ambos en Secret Manager (hoy tienen un valor provisional):
+3. Guarda ambos en Secret Manager (hoy tienen las credenciales de producción de Passva SpA):
    `firebase functions:secrets:set MP_ACCESS_TOKEN` y `firebase functions:secrets:set MP_WEBHOOK_SECRET`.
 4. Cambia `PAYMENTS_PROVIDER=mercadopago` en `functions/.env` y despliega: `firebase deploy --only functions`.
 
