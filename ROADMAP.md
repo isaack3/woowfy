@@ -21,8 +21,8 @@ espera, landing honesta, admin con pestaña Pagos, liquidaciones que se pueden a
 Woowfy es un producto de **Passva SpA** (RUT 78.487.341-2), contacto `hola@passva.com`.
 
 **Para retomar, primero lo que depende de ti** (sección "Pendiente" más abajo): probar el escáner en iPhone,
-activar Resend (los correos ya están listos), revisión legal y pasar Mercado Pago a producción con la cuenta de
-Passva SpA. Con eso se puede lanzar (botón "Lanzar" arriba del admin).
+activar Resend (los correos ya están listos) y la revisión legal. **Mercado Pago ya cobra en producción** con la cuenta de
+Passva SpA (25-10): cada compra mueve dinero real. Con eso se puede lanzar (botón "Lanzar" arriba del admin).
 
 ---
 
@@ -141,8 +141,8 @@ y desplegada el 28-09; datos de producción migrados
 - [x] #14 Código de retiro: si no carga, muestra el guardado en el teléfono o "Reintentar"
 - [x] No-shows sin pisar un retiro recién validado · cuenta bancaria: se puede quitar y se validan todos los campos
       · el local ya no puede mover su ubicación en el mapa
-- [ ] #10 Correr `node tool/check-legacy-fields.mjs` (solo lectura) para ver si quedan datos antiguos expuestos
-- [ ] #13 Decidir si el arrepentimiento de 15 min aplica cuando el retiro ya empezó
+- [x] #10 Producción revisada con `node tool/check-legacy-fields.mjs`: sin códigos de retiro ni correos expuestos
+- [x] #13 El arrepentimiento de 15 min ya no aplica si el retiro empezó (rige la regla de 2 h); /terms y guía al día
 - [ ] (Opcional) Activar TTL en `pickupCodes.expireAt` (consola → Firestore → TTL)
 
 **Etapa B — Operación de pagos ✅**
@@ -291,8 +291,8 @@ Puntajes (heurísticas de Nielsen): Home 22/40 · flujo cliente 22/40 · comerci
       Admin → Correo (hoy el secreto tiene un valor provisional)
 - [x] ~~Reenvío `hola@woowfy.com` con ImprovMX~~: ya no hace falta, el contacto es `hola@passva.com` (10-10). Queda opcional el TXT `_dmarc`
 - [ ] 🗺️ Revisar el mapa en la app y poner la dirección real de tu local (hoy ubicado en el centro de El Monte)
-- [ ] ⚖️ Revisión legal de `/terms` y `/privacy` (ya con los datos de Passva SpA) y confirmar los valores en
-      amarillo (2 reservas, 25%, pago semanal)
+- [ ] ⚖️ Revisión legal de `/terms` y `/privacy` (ya con los datos de Passva SpA; valores confirmados el 25-10:
+      2 reservas, 2 h, 15 min, 25%, pago semanal). Consultar también quién emite la boleta al cliente
 - [ ] 💰 **Alerta de presupuesto** en Google Cloud Billing (ej. USD 10)
 - [ ] ↪️ Redirección 301 `www.woowfy.com` → `woowfy.com` (consola → Hosting → sitio woowfy-app → editar dominio)
 - [x] `firebase functions:secrets:prune` (hecho el 10-10)
@@ -316,7 +316,7 @@ Puntajes (heurísticas de Nielsen): Home 22/40 · flujo cliente 22/40 · comerci
 ## Fase 2 — Pagos reales y operación
 
 - [x] **SpA:** Woowfy es de **Passva SpA** (RUT 78.487.341-2), ver sección "Empresa" abajo
-- [ ] Cuenta Mercado Pago **a nombre de Passva SpA** ← bloquea el cobro real
+- [x] Cuenta Mercado Pago **a nombre de Passva SpA** con credenciales de producción en Secret Manager (25-10)
 - [x] Implementar `MercadoPagoProvider` (Checkout Pro) + webhook `mercadoPagoWebhook` firmado + reembolsos (Sprint 3)
 - [x] Probar con **credenciales de prueba** de Mercado Pago: compra de punta a punta OK (28-09)
 - [ ] Definir cómo se paga a los comercios:
@@ -409,7 +409,7 @@ Los pasos siguientes quedan por confirmar.
 - [ ] **5. Cuenta bancaria** a nombre de la SpA (banco o banco digital para pymes).
 - [ ] **6. Patente municipal** en la comuna del domicilio de la empresa (aunque sea tu casa u oficina virtual).
 - [ ] **7. Contador** (aprox. CLP 30–80 mil/mes para una SpA pequeña): declaraciones mensuales (F29) y anual.
-- [ ] **8. Cuenta Mercado Pago de empresa** con el RUT de Passva SpA → credenciales de producción.
+- [x] **8. Cuenta Mercado Pago de empresa** con el RUT de Passva SpA → credenciales de producción (25-10).
 - [ ] **9. Marca "Woowfy" en [INAPI](https://www.inapi.cl)** (clases 35, 39/43 y 42) y dominio `woowfy.cl` en NIC Chile.
 - [ ] **10. Contratos**: acuerdo con comercios (comisión, responsabilidad sanitaria del local, reembolsos)
       y T&C para clientes. Idealmente revisados por un abogado.

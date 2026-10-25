@@ -322,10 +322,12 @@ class BagOrder {
     );
   }
 
-  /// Hasta cuándo el cliente puede cancelar con reembolso: 2 h antes del retiro o 15 min después de pagar.
+  /// Hasta cuándo el cliente puede cancelar con reembolso: 2 h antes del retiro, o 15 min después de pagar pero
+  /// nunca pasado el inicio del retiro (igual que cancelDeadline en functions/src/orders.ts).
   DateTime get cancelDeadline {
     final beforePickup = pickupStart.subtract(const Duration(hours: cancelHoursBefore));
-    final grace = paidAt?.add(const Duration(minutes: cancelGraceMinutes));
+    var grace = paidAt?.add(const Duration(minutes: cancelGraceMinutes));
+    if (grace != null && grace.isAfter(pickupStart)) grace = pickupStart;
     return grace != null && grace.isAfter(beforePickup) ? grace : beforePickup;
   }
 }
@@ -528,7 +530,8 @@ const noShowGraceMinutes = 60;
 /// Reglas para el cliente, con el mismo texto en el detalle de la bolsa y en el comprobante.
 String get ruleHold => 'Te la guardamos $paymentTimeoutMinutes min mientras pagas.';
 String get ruleCancel =>
-    'Puedes cancelar con reembolso hasta $cancelHoursBefore h antes del retiro, o en los $cancelGraceMinutes min después de pagar.';
+    'Puedes cancelar con reembolso hasta $cancelHoursBefore h antes del retiro, o en los $cancelGraceMinutes min después '
+    'de pagar si el retiro aún no empieza.';
 /// Llegar dentro del horario: antes, el local puede no tener la bolsa lista.
 const rulePickupWindow = 'Llega dentro del horario de retiro: antes, el local aún puede estar armando tu bolsa.';
 

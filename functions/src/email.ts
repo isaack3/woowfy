@@ -4,14 +4,12 @@ import { defineSecret } from "firebase-functions/params";
 import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
+import { cancelDeadline } from "./orders.js";
 
 /** API key de Resend (https://resend.com). Se define con: firebase functions:secrets:set RESEND_API_KEY */
 const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
 
 const APP_URL = "https://app.woowfy.com";
-/** Igual que en orders.ts (política de cancelación, ver /terms). */
-const CANCEL_HOURS_BEFORE = 2;
-const CANCEL_GRACE_MINUTES = 15;
 
 /** Configuración editable desde Admin → Correo (documento config/email). */
 interface EmailSettings {
@@ -134,10 +132,7 @@ interface OrderMail {
 /** Confirmación de compra con el código de retiro. */
 function purchaseEmail(o: OrderMail) {
   // Hasta cuándo puede cancelar con reembolso (misma regla que cancelOrder).
-  const limit = new Date(Math.max(
-    o.pickupStart.getTime() - CANCEL_HOURS_BEFORE * 3600_000,
-    (o.paidAt?.getTime() ?? 0) + CANCEL_GRACE_MINUTES * 60_000,
-  ));
+  const limit = new Date(cancelDeadline(o.pickupStart.getTime(), o.paidAt?.getTime()));
   const code = o.code
     ? `<div style="margin:0 0 24px;padding:20px;background:#E6F8CC;border-radius:18px;text-align:center">
   <div style="font-size:13px;color:#4E5A53;margin-bottom:6px">Tu código de retiro</div>

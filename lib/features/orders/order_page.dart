@@ -149,7 +149,7 @@ class _Body extends StatelessWidget {
             ] else
               Text(
                 'Ya no se puede cancelar: el plazo es hasta $cancelHoursBefore horas antes del retiro '
-                'o $cancelGraceMinutes minutos después de pagar.',
+                'o $cancelGraceMinutes minutos después de pagar, si el retiro aún no empieza.',
                 textAlign: TextAlign.center,
                 style: t.bodySmall?.copyWith(color: WoowfyColors.muted),
               ),

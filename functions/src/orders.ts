@@ -17,6 +17,16 @@ const REDEEM_GRACE_MINUTES = 60;
 export const CANCEL_HOURS_BEFORE = 2;
 /** Arrepentimiento: el cliente también puede cancelar (con reembolso) hasta estos minutos después de pagar. */
 export const CANCEL_GRACE_MINUTES = 15;
+
+/**
+ * Hasta cuándo se puede cancelar un pedido pagado con reembolso (ms): 2 h antes del retiro, o 15 min después de
+ * pagar pero nunca pasado el inicio del retiro (si no, se podría cancelar con la bolsa ya entregada).
+ */
+export function cancelDeadline(pickupStartMs: number, paidAtMs?: number): number {
+  const beforePickup = pickupStartMs - CANCEL_HOURS_BEFORE * 3600_000;
+  const grace = paidAtMs ? Math.min(paidAtMs + CANCEL_GRACE_MINUTES * 60_000, pickupStartMs) : 0;
+  return Math.max(beforePickup, grace);
+}
 /** Reservas sin pagar que puede tener una persona al mismo tiempo. */
 const MAX_PENDING_ORDERS = 2;
 
@@ -295,12 +305,10 @@ export const cancelOrder = onCall({ secrets: PAYMENT_SECRETS }, async (req) => {
     return { refunded: false };
   }
   if (order.status !== "paid") throw new HttpsError("failed-precondition", "Este pedido ya no se puede cancelar.");
-  const limit = order.pickupStart.toMillis() - CANCEL_HOURS_BEFORE * 3600_000;
-  const grace = order.paidAt ? order.paidAt.toMillis() + CANCEL_GRACE_MINUTES * 60_000 : 0;
-  if (Date.now() > Math.max(limit, grace)) {
+  if (Date.now() > cancelDeadline(order.pickupStart.toMillis(), order.paidAt?.toMillis())) {
     throw new HttpsError("failed-precondition",
       `Solo puedes cancelar hasta ${CANCEL_HOURS_BEFORE} horas antes del inicio del retiro ` +
-      `o dentro de ${CANCEL_GRACE_MINUTES} minutos después de pagar.`);
+      `o dentro de ${CANCEL_GRACE_MINUTES} minutos después de pagar, si el retiro aún no empieza.`);
   }
   await db.runTransaction(async (tx) => {
     const fresh = (await tx.get(ref)).data();
