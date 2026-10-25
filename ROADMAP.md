@@ -143,7 +143,7 @@ y desplegada el 28-09; datos de producción migrados
       · el local ya no puede mover su ubicación en el mapa
 - [x] #10 Producción revisada con `node tool/check-legacy-fields.mjs`: sin códigos de retiro ni correos expuestos
 - [x] #13 El arrepentimiento de 15 min ya no aplica si el retiro empezó (rige la regla de 2 h); /terms y guía al día
-- [ ] (Opcional) Activar TTL en `pickupCodes.expireAt` (consola → Firestore → TTL)
+- [x] TTL activo en `pickupCodes.expireAt` (26-10): Firestore borra solo los códigos de retiro vencidos
 
 **Etapa B — Operación de pagos ✅**
 - [x] Red de seguridad de pagos (el pedido se concilia con Mercado Pago si el aviso no llega)

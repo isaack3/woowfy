@@ -137,7 +137,7 @@ Todo lo que Woowfy usa fuera del repositorio, dónde vive y para qué. Al agrega
 
 | Servicio | Región | Para qué | Notas |
 |---|---|---|---|
-| Firestore (modo nativo) | `southamerica-west1` (Santiago) | Base de datos: locales, bolsas, pedidos, liquidaciones, configuración | Reglas en `firestore.rules`, índices en `firestore.indexes.json` |
+| Firestore (modo nativo) | `southamerica-west1` (Santiago) | Base de datos: locales, bolsas, pedidos, liquidaciones, configuración | Reglas en `firestore.rules`, índices en `firestore.indexes.json`; TTL en `pickupCodes.expireAt` (borra los códigos de retiro vencidos) |
 | Cloud Functions (2.ª gen, Node 22) | Santiago y São Paulo (ver tabla de abajo) | Toda la lógica de dinero, correos, avisos y tareas programadas | Código en `functions/src` |
 | Cloud Scheduler | `southamerica-east1` (São Paulo) | Dispara las 4 funciones programadas | No existe en Santiago |
 | Cloud Storage | Santiago | Fotos de bolsas y logos (`uploads/{uid}/…`) | Bucket `woowfy-app.firebasestorage.app`; reglas en `storage.rules`; CORS en `storage-cors.json` |
