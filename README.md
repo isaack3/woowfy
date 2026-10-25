@@ -352,7 +352,7 @@ DNS administrado en **Piensa Solutions**.
 | Dominio | Registro DNS | Sitio de Firebase Hosting |
 |---|---|---|
 | `woowfy.com` | A `199.36.158.100` + TXT `hosting-site=woowfy-app` | `woowfy-app` (landing) |
-| `www.woowfy.com` | CNAME `woowfy-app.web.app` | `woowfy-app` (landing) |
+| `www.woowfy.com` | CNAME `woowfy-app.web.app` | `woowfy-app`: **redirección 301** a `woowfy.com` (conserva la ruta) |
 | `app.woowfy.com` | CNAME `woowfy-app-web.web.app` | `woowfy-app-web` (app) |
 
 Registros de **Resend** (envío de correos desde `@woowfy.com`, agregados el 25-10-2026):
@@ -443,6 +443,15 @@ Plantillas en `functions/src/email.ts` (HTML con la paleta de la marca):
   Admin → Correo apagado no se envía nada.
 - Correo de contacto: `hola@passva.com` (Passva SpA, dueña de Woowfy). `hola@woowfy.com` solo envía (Resend) y las respuestas van a `hola@passva.com`.
 - "Recuperar contraseña" lo envía Firebase Auth (en español), no Resend.
+
+## Buscadores (SEO)
+
+- **woowfy.com** se indexa: `landing/robots.txt` (permite todo salvo `/api/`) y `landing/sitemap.xml` con las páginas
+  públicas (inicio, `/merchants`, `/terms`, `/privacy`), cada una con su `<link rel="canonical">`. Al agregar una
+  página, súmala al sitemap y actualiza su `lastmod`.
+- **app.woowfy.com** no se indexa: `web/robots.txt` con `Disallow: /` (Flutter dibuja en canvas, las bolsas duran un
+  día y hay rutas privadas). Hosting sirve los archivos reales antes de la reescritura a `index.html`.
+- El sitemap se envía en Google Search Console → Sitemaps.
 
 ## Páginas legales
 

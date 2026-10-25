@@ -1,0 +1,4 @@
+# app.woowfy.com: la app no se indexa (Flutter dibuja en canvas, las bolsas duran un día y hay rutas privadas).
+# El posicionamiento lo hace woowfy.com. Las vistas previas de enlaces (WhatsApp, etc.) no dependen de este archivo.
+User-agent: *
+Disallow: /

@@ -316,7 +316,9 @@ Puntajes (heurísticas de Nielsen): Home 22/40 · flujo cliente 22/40 · comerci
 - [ ] ⚖️ Revisión legal de `/terms` y `/privacy` (ya con los datos de Passva SpA; valores confirmados el 25-10:
       2 reservas, 2 h, 15 min, 25%, pago semanal). Consultar también quién emite la boleta al cliente
 - [ ] 💰 **Alerta de presupuesto** en Google Cloud Billing (ej. USD 10)
-- [ ] ↪️ Redirección 301 `www.woowfy.com` → `woowfy.com` (consola → Hosting → sitio woowfy-app → editar dominio)
+- [x] 🔎 `robots.txt` y `sitemap.xml` en woowfy.com; la app no se indexa (26-10)
+- [ ] 🔎 Enviar `https://woowfy.com/sitemap.xml` en Google Search Console → Sitemaps
+- [x] ↪️ Redirección 301 `www.woowfy.com` → `woowfy.com` (26-10, conserva la ruta)
 - [x] `firebase functions:secrets:prune` (hecho el 10-10)
 - [ ] Personalizar la plantilla del correo "recuperar contraseña" (Authentication → Plantillas)
 - [ ] Enviar el aviso de lanzamiento cuando lances (sale del mismo botón "Lanzar"; también en Admin → Interesados)

@@ -1,0 +1,6 @@
+# woowfy.com: la landing es pública e indexable. /api/ son funciones (lista de espera), no páginas.
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://woowfy.com/sitemap.xml

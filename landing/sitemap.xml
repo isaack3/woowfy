@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Páginas públicas de woowfy.com. Al agregar una página o cambiar mucho una existente, actualizar aquí. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://woowfy.com/</loc>
+    <lastmod>2026-10-25</lastmod>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://woowfy.com/merchants</loc>
+    <lastmod>2026-10-25</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://woowfy.com/terms</loc>
+    <lastmod>2026-10-25</lastmod>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://woowfy.com/privacy</loc>
+    <lastmod>2026-10-25</lastmod>
+    <priority>0.3</priority>
+  </url>
+</urlset>
