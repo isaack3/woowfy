@@ -179,7 +179,7 @@ y desplegada el 28-09; datos de producción migrados
 **Etapa C3 — Documentos tributarios (por hacer, urgente con Mercado Pago en producción)**
 Decidido el 25-10: Passva SpA es **comisionista** (como Too Good To Go): vende a nombre propio por cuenta del local,
 emite la boleta al cliente y, en cada liquidación, una **liquidación-factura** (DTE 43) al local descontando su
-comisión. Términos ya ajustados (borrador). Falta confirmarlo con el contador.
+comisión. Términos ya ajustados (vigentes desde el 26-10). Falta confirmarlo con el contador.
 - [ ] Contador: confirmar comisión mercantil + liquidación-factura e IVA de alimentos
 - [ ] Elegir proveedor de documentos electrónicos con API (boletas y liquidaciones-factura)
 - [ ] Boleta electrónica automática al pagarse cada pedido (función + envío por correo)

@@ -455,8 +455,8 @@ Plantillas en `functions/src/email.ts` (HTML con la paleta de la marca):
 
 ## Páginas legales
 
-`landing/terms.html` (`/terms`) y `landing/privacy.html` (`/privacy`): **borradores** pendientes de revisión
-legal. Ya tienen los datos de **Passva SpA** (RUT 78.487.341-2, Santiago); los valores (2 reservas, 2 h, 15 min, 25%,
+`landing/terms.html` (`/terms`) y `landing/privacy.html` (`/privacy`): **publicados como versión vigente** desde el 26-10-2026 (sin aviso de borrador; conviene igual una revisión
+legal). Ya tienen los datos de **Passva SpA** (RUT 78.487.341-2, Santiago); los valores (2 reservas, 2 h, 15 min, 25%,
 pago semanal) se confirmaron el 25-10-2026. Actualizados el 29-09-2026 con: código de retiro
 personal, pedidos no retirados, arrepentimiento de 15 min, reembolso de pagos tardíos, comisión y liquidaciones,
 calificaciones públicas con nombre de pila, notificaciones, datos bancarios de comercios, analítica anónima y
